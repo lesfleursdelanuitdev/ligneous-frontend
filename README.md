@@ -1,36 +1,96 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Ligneous Frontend
+
+Frontend application for the Ligneous GEDCOM genealogy platform.
+
+## Tech Stack
+
+- **Next.js 16** - React framework with App Router
+- **Mycelia Plugin System** - Domain logic and state management
+- **Tailwind CSS** - Styling
+- **Axios** - HTTP client
+
+## Features
+
+- User authentication (registration, login)
+- Tree management (create, view, edit, delete)
+- Tree collaboration (share trees with permissions)
+- User-individual linking (link users to individuals in trees)
+- GEDCOM file processing (via Go API)
+- Family tree visualization
+- Relationship queries
+- Graph analytics
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18+
+- Go API running (default: http://localhost:8090)
+
+**Note:** The gateway is built into this frontend as Next.js API routes, so no separate gateway service is needed.
+
+### Installation
+
+```bash
+npm install
+```
+
+### Environment Variables
+
+Create a `.env.local` file:
+
+```bash
+# Go API URL (Next.js API routes will proxy to this)
+GO_API_URL=http://localhost:8090
+
+# Frontend API base URL (Next.js API routes run on same port as frontend)
+NEXT_PUBLIC_API_URL=http://localhost:4000/api
+```
+
+### Development
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:4000](http://localhost:4000) in your browser.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+**Note:** Frontend runs on port 4000 (not 3000) to avoid conflicts.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Build
 
-## Learn More
+```bash
+npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+ligneous-frontend/
+├── app/                    # Next.js App Router
+│   ├── layout.js          # Root layout
+│   ├── page.js            # Home page
+│   ├── (auth)/            # Auth routes
+│   └── (dashboard)/       # Dashboard routes
+├── mycelia/               # Mycelia Plugin System
+│   ├── system.builder.js  # System builder
+│   └── hooks/             # Mycelia hooks (facets)
+├── components/            # React components
+├── hooks/                 # React hooks (wrappers)
+└── utils/                 # Utilities
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Architecture
 
-## Deploy on Vercel
+This frontend uses **Mycelia Plugin System** for domain logic:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Facets** - Domain logic (auth, trees, API client)
+- **React Components** - UI only (presentation layer)
+- **Event-Driven** - Facets emit events, React listens
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+See `SIMPLIFIED_ARCHITECTURE_PLAN.md` in the gateway project for full architecture details.
+
+## License
+
+MIT

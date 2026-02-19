@@ -1,0 +1,1810 @@
+// Prisma Schema for Ligneous Frontend
+// Database: PostgreSQL (separate from Go API database)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// 1. Users Table
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  username       String    @unique @db.VarChar(255)
+  email          String    @unique @db.VarChar(255)
+  passwordHash   String    @map("password_hash") @db.VarChar(255)
+  name           String?   @db.VarChar(255)
+  isWebsiteOwner Boolean   @default(false) @map("is_website_owner")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(6)
+  isActive       Boolean   @default(true) @map("is_active")
+
+  // Relations
+  sessions               Session[]
+  passwordResetTokens    PasswordResetToken[]
+  treeOwners             TreeOwner[]
+  userIndividualLinks    UserIndividualLink[]
+  permissions            Permission[]
+  grantedPermissions     Permission[]         @relation("PermissionGrantedBy")
+  treeMaintainers        TreeMaintainer[]
+  accessRequests         AccessRequest[]
+  respondedRequests      AccessRequest[]      @relation("RequestRespondedBy")
+  addedMaintainers       TreeMaintainer[]     @relation("MaintainerAddedBy")
+  addedOwners            TreeOwner[]          @relation("OwnerAddedBy")
+  createdInvitationLinks InvitationLink[]     @relation("InvitationLinksCreated")
+  invitationLinkUses     InvitationLinkUse[]  @relation("InvitationLinkUses")
+  albums                 Album[]
+  albumMedia             AlbumMedia[]         @relation("AlbumMediaAddedBy")
+  albumShares            AlbumShare[]
+  sharedAlbums           AlbumShare[]         @relation("AlbumSharedBy")
+  userTags               Tag[]                @relation("UserTags")
+  createdTags            Tag[]                @relation("TagCreator")
+  taggedItems            TaggedItem[]         @relation("TaggedBy")
+
+  // Collaboration relations
+  comments             Comment[]
+  discussionThreads    DiscussionThread[] @relation("ThreadCreator")
+  discussionPosts      DiscussionPost[]
+  suggestions          Suggestion[]       @relation("SuggestionAuthor")
+  reviewedSuggestions  Suggestion[]       @relation("SuggestionReviewer")
+  researchNotes        ResearchNote[]
+  notebooks            Notebook[]
+  sentMessages         Message[]          @relation("SentMessages")
+  receivedMessages     Message[]          @relation("ReceivedMessages")
+  createdMessageGroups MessageGroup[]
+  messageGroupMembers  MessageGroup[]     @relation("GroupMembers")
+
+  // User profile & following
+  profile   UserProfile?
+  following Follow[]     @relation("Following")
+  followers Follow[]     @relation("Followers")
+
+  // Content & feed
+  userContent     UserContent[]
+  contentLikes    ContentLike[]
+  contentComments ContentComment[]
+  contentShares   ContentShare[]
+  userFeeds       UserFeed[]
+
+  // Notifications & activity
+  notifications       Notification[]
+  notificationsActed  Notification[] @relation("NotificationActor")
+  activities    Activity[]
+
+  // Mentions
+  commentMentions Comment[]          @relation("CommentMentions")
+  postMentions    DiscussionPost[]   @relation("PostMentions")
+  threadWatchers  DiscussionThread[] @relation("ThreadWatchers")
+
+  @@index([email])
+  @@index([username])
+  @@map("users")
+}
+
+// 2. Sessions Table
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  tokenHash        String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  refreshTokenHash String?   @unique @map("refresh_token_hash") @db.VarChar(255)
+  refreshExpiresAt DateTime? @map("refresh_expires_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastUsedAt       DateTime  @default(now()) @map("last_used_at") @db.Timestamptz(6)
+  ipAddress        String?   @map("ip_address") @db.Inet
+  userAgent        String?   @map("user_agent") @db.Text
+  isRevoked        Boolean   @default(false) @map("is_revoked")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@index([refreshTokenHash])
+  @@index([expiresAt])
+  @@index([refreshExpiresAt])
+  @@index([userId, isRevoked, expiresAt])
+  @@index([userId, isRevoked, refreshExpiresAt])
+  @@map("sessions")
+}
+
+// 2a. Password Reset Tokens Table
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  token     String    @unique @db.VarChar(255) // Secure random token
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+  @@index([userId, expiresAt, usedAt])
+  @@map("password_reset_tokens")
+}
+
+// 3. Trees Table
+model Tree {
+  id          String   @id @default(uuid()) @db.Uuid
+  fileId      String   @unique @map("file_id") @db.VarChar(255)
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  isPublic    Boolean  @default(false) @map("is_public")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  gedcomFileId String?     @unique @map("gedcom_file_id") @db.Uuid
+  gedcomFile   GedcomFile? @relation(fields: [gedcomFileId], references: [id], onDelete: SetNull)
+
+  // Relations
+  owners              TreeOwner[]
+  userIndividualLinks UserIndividualLink[]
+  permissions         Permission[]
+  treeMaintainers     TreeMaintainer[]
+  accessRequests      AccessRequest[]
+  privateData         PrivateData[]
+  invitationLinks     InvitationLink[]
+
+  // Collaboration relations
+  comments          Comment[]
+  discussionThreads DiscussionThread[]
+  suggestions       Suggestion[]
+  researchNotes     ResearchNote[]
+  messageGroups     MessageGroup[]
+  userContent       UserContent[]
+  follows           Follow[]
+  activities        Activity[]
+  notifications     Notification[]
+
+  @@index([fileId])
+  @@index([isPublic])
+  @@map("trees")
+}
+
+// 3a. Tree Owners Table (Multiple owners per tree)
+model TreeOwner {
+  id        String   @id @default(uuid()) @db.Uuid
+  treeId    String   @map("tree_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  isPrimary Boolean  @default(false) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  addedBy   String?  @map("added_by") @db.Uuid
+
+  tree  Tree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adder User? @relation("OwnerAddedBy", fields: [addedBy], references: [id], onDelete: SetNull)
+
+  @@unique([treeId, userId])
+  @@index([treeId])
+  @@index([userId])
+  @@index([treeId, isPrimary])
+  @@map("tree_owners")
+}
+
+// 4. User-Individual Links Table
+model UserIndividualLink {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  treeId         String   @map("tree_id") @db.Uuid
+  individualXref String   @map("individual_xref") @db.VarChar(50)
+  verified       Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree Tree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, treeId, individualXref])
+  @@index([userId])
+  @@index([treeId])
+  @@index([treeId, individualXref])
+  @@index([userId, verified])
+  @@map("user_individual_links")
+}
+
+// 5. Permissions Table
+enum PermissionType {
+  read
+  write
+  delete
+  admin
+}
+
+enum ResourceType {
+  tree
+  individual
+  family
+  subtree
+}
+
+enum AccessRequestType {
+  basic_access // Request read or write access to tree
+  individual_link // "This is me" - link to individual
+  maintainer_role // Request to become tree maintainer
+  owner_role // Request to become tree owner
+}
+
+model Permission {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  treeId         String         @map("tree_id") @db.Uuid
+  resourceType   ResourceType   @map("resource_type")
+  resourceId     String         @map("resource_id") @db.VarChar(255)
+  permissionType PermissionType @map("permission_type")
+  grantedBy      String?        @map("granted_by") @db.Uuid
+  grantedAt      DateTime       @default(now()) @map("granted_at") @db.Timestamptz(6)
+  expiresAt      DateTime?      @map("expires_at") @db.Timestamptz(6)
+  notes          String?        @db.Text
+
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree    Tree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  granter User? @relation("PermissionGrantedBy", fields: [grantedBy], references: [id])
+
+  @@unique([userId, treeId, resourceType, resourceId, permissionType])
+  @@index([userId, treeId])
+  @@index([treeId, resourceType, resourceId])
+  @@index([expiresAt])
+  @@map("permissions")
+}
+
+// 6. Tree Maintainers Table
+model TreeMaintainer {
+  id        String   @id @default(uuid()) @db.Uuid
+  treeId    String   @map("tree_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  addedBy   String?  @map("added_by") @db.Uuid
+
+  tree  Tree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adder User? @relation("MaintainerAddedBy", fields: [addedBy], references: [id])
+
+  @@unique([treeId, userId])
+  @@index([treeId])
+  @@index([userId])
+  @@map("tree_maintainers")
+}
+
+// 7. Access Requests Table
+enum AccessRequestStatus {
+  pending
+  approved
+  rejected
+  cancelled
+}
+
+model AccessRequest {
+  id                      String              @id @default(uuid()) @db.Uuid
+  userId                  String              @map("user_id") @db.Uuid
+  treeId                  String              @map("tree_id") @db.Uuid
+  requestType             AccessRequestType   @default(basic_access) @map("request_type")
+  resourceType            ResourceType?       @map("resource_type")
+  resourceId              String?             @map("resource_id") @db.VarChar(255)
+  requestedPermissionType PermissionType?     @map("requested_permission_type")
+  status                  AccessRequestStatus @default(pending)
+  notes                   String?             @db.Text
+  responseNotes           String?             @map("response_notes") @db.Text
+  requestedAt             DateTime            @default(now()) @map("requested_at") @db.Timestamptz(6)
+  respondedAt             DateTime?           @map("responded_at") @db.Timestamptz(6)
+  respondedBy             String?             @map("responded_by") @db.Uuid
+
+  user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree      Tree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  responder User? @relation("RequestRespondedBy", fields: [respondedBy], references: [id])
+
+  @@index([userId])
+  @@index([treeId])
+  @@index([requestType, status])
+  @@index([status])
+  @@index([treeId, status])
+  @@map("access_requests")
+}
+
+// 8. Private Data Table
+model PrivateData {
+  id           String       @id @default(uuid()) @db.Uuid
+  treeId       String       @map("tree_id") @db.Uuid
+  resourceType ResourceType @map("resource_type")
+  resourceId   String       @map("resource_id") @db.VarChar(255)
+  fieldName    String       @map("field_name") @db.VarChar(255)
+  isPrivate    Boolean      @default(true) @map("is_private")
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tree Tree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  @@index([treeId, resourceType, resourceId])
+  @@index([treeId])
+  @@map("private_data")
+}
+
+// 9. Invitation Links Table
+model InvitationLink {
+  id             String    @id @default(uuid()) @db.Uuid
+  token          String    @unique @default(uuid()) @db.Uuid
+  treeId         String    @map("tree_id") @db.Uuid
+  createdBy      String    @map("created_by") @db.Uuid
+  roleType       String    @map("role_type") @db.VarChar(50) // 'read', 'write', 'maintainer', 'owner'
+  individualXref String?   @map("individual_xref") @db.VarChar(50) // Optional: if linking to individual
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(6)
+  maxUses        Int?      @map("max_uses") // null = unlimited, 1 = one-time
+  usedCount      Int       @default(0) @map("used_count")
+  isRevoked      Boolean   @default(false) @map("is_revoked")
+  notes          String?   @db.Text // Description of link purpose
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tree    Tree                @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  creator User                @relation("InvitationLinksCreated", fields: [createdBy], references: [id], onDelete: Cascade)
+  uses    InvitationLinkUse[]
+
+  @@index([token])
+  @@index([treeId])
+  @@index([createdBy])
+  @@index([isRevoked, expiresAt])
+  @@map("invitation_links")
+}
+
+// 10. Invitation Link Usage Tracking Table
+model InvitationLinkUse {
+  id        String   @id @default(uuid()) @db.Uuid
+  linkId    String   @map("link_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  usedAt    DateTime @default(now()) @map("used_at") @db.Timestamptz(6)
+  ipAddress String?  @map("ip_address") @db.Inet
+
+  link InvitationLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  user User           @relation("InvitationLinkUses", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([linkId, userId])
+  @@index([linkId])
+  @@index([userId])
+  @@map("invitation_link_uses")
+}
+
+// 11. Albums Table
+model Album {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  name         String   @db.VarChar(255)
+  description  String?  @db.Text
+  coverMediaId String?  @map("cover_media_id") @db.VarChar(255) // UUID from Go API
+  isPublic     Boolean  @default(false) @map("is_public")
+  sortOrder    Int      @default(0) @map("sort_order") // For user's album ordering
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  albumMedia  AlbumMedia[]
+  albumShares AlbumShare[]
+
+  @@index([userId])
+  @@index([userId, isPublic])
+  @@map("albums")
+}
+
+// 12. Album-Media Junction Table
+model AlbumMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  albumId   String   @map("album_id") @db.Uuid
+  fileId    String   @map("file_id") @db.VarChar(255) // Go API file_id
+  mediaId   String   @map("media_id") @db.VarChar(255) // Go API media UUID
+  sortOrder Int      @default(0) @map("sort_order") // Order within album
+  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz(6)
+  addedBy   String?  @map("added_by") @db.Uuid // User who added it
+
+  album Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  adder User? @relation("AlbumMediaAddedBy", fields: [addedBy], references: [id], onDelete: SetNull)
+
+  @@unique([albumId, fileId, mediaId]) // Prevent duplicates
+  @@index([albumId])
+  @@index([fileId, mediaId]) // For finding which albums contain a media
+  @@map("album_media")
+}
+
+// 13. Album Sharing Table
+model AlbumShare {
+  id       String   @id @default(uuid()) @db.Uuid
+  albumId  String   @map("album_id") @db.Uuid
+  userId   String   @map("user_id") @db.Uuid
+  canEdit  Boolean  @default(false) @map("can_edit")
+  sharedAt DateTime @default(now()) @map("shared_at") @db.Timestamptz(6)
+  sharedBy String   @map("shared_by") @db.Uuid
+
+  album  Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sharer User  @relation("AlbumSharedBy", fields: [sharedBy], references: [id], onDelete: Cascade)
+
+  @@unique([albumId, userId])
+  @@index([albumId])
+  @@index([userId])
+  @@map("album_shares")
+}
+
+// 14. Tags Table (supports both global and user-specific)
+model Tag {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @map("user_id") @db.Uuid // null = global tag, set = user tag
+  name        String   @db.VarChar(100)
+  color       String?  @db.VarChar(7) // Hex color for UI
+  description String?  @db.Text
+  isGlobal    Boolean  @default(false) @map("is_global") // Explicit flag for clarity
+  createdBy   String?  @map("created_by") @db.Uuid // Who created it (for global tags, could be admin)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user    User?        @relation("UserTags", fields: [userId], references: [id], onDelete: Cascade)
+  creator User?        @relation("TagCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  items   TaggedItem[]
+
+  // Note: Uniqueness constraints handled in application logic:
+  // - Global tags: unique by name (only one "Ancestor" tag globally)
+  // - User tags: unique by (userId, name) (each user can have their own "Ancestor" tag)
+  @@index([userId])
+  @@index([isGlobal])
+  @@index([isGlobal, name])
+  @@index([name]) // For global tag uniqueness check
+  @@index([userId, name]) // For user tag uniqueness check
+  @@map("tags")
+}
+
+// 15. Entity Type Enum (for tagging)
+enum EntityType {
+  media
+  event
+  individual
+  family
+  note
+  source
+  place
+  date
+}
+
+// 16. Tagged Items Table (polymorphic - can tag any entity type)
+model TaggedItem {
+  id         String     @id @default(uuid()) @db.Uuid
+  tagId      String     @map("tag_id") @db.Uuid
+  taggedBy   String     @map("tagged_by") @db.Uuid // User who applied this tag
+  entityType EntityType @map("entity_type")
+  fileId     String     @map("file_id") @db.VarChar(255) // Go API file_id
+  entityId   String     @map("entity_id") @db.VarChar(255) // UUID or XREF
+  entityXref String?    @map("entity_xref") @db.VarChar(50) // Optional XREF for convenience
+  taggedAt   DateTime   @default(now()) @map("tagged_at") @db.Timestamptz(6)
+
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  user User @relation("TaggedBy", fields: [taggedBy], references: [id], onDelete: Cascade)
+
+  // Prevent duplicate tagging: same tag applied to same entity by same user
+  @@unique([tagId, taggedBy, entityType, fileId, entityId])
+  @@index([tagId])
+  @@index([taggedBy, entityType, fileId, entityId]) // Find user's tags for an entity
+  @@index([entityType, fileId, entityId]) // Find all tags for an entity
+  @@index([taggedBy]) // Find all entities tagged by a user
+  @@map("tagged_items")
+}
+
+// ============================================================================
+// COLLABORATION TABLES
+// ============================================================================
+
+// 17. Comments Table
+model Comment {
+  id         String    @id @default(uuid()) @db.Uuid
+  entityType String    @map("entity_type") @db.VarChar(50)
+  entityId   String    @map("entity_id") @db.VarChar(255)
+  treeId     String    @map("tree_id") @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  parentId   String?   @map("parent_id") @db.Uuid
+  content    String    @db.Text
+  isEdited   Boolean   @default(false) @map("is_edited")
+  isResolved Boolean   @default(false) @map("is_resolved")
+  isPinned   Boolean   @default(false) @map("is_pinned")
+  isHidden   Boolean   @default(false) @map("is_hidden")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree     Tree      @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  Comment[] @relation("CommentReplies")
+  mentions User[]    @relation("CommentMentions")
+
+  @@index([entityType, entityId])
+  @@index([treeId])
+  @@index([userId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+// 18. Discussion Threads Table
+model DiscussionThread {
+  id          String   @id @default(uuid()) @db.Uuid
+  treeId      String?  @map("tree_id") @db.Uuid
+  title       String   @db.VarChar(255)
+  description String?  @db.Text
+  category    String?  @db.VarChar(100)
+  tags        String[] // Array of tags (surnames, locations, etc.)
+  isLocked    Boolean  @default(false) @map("is_locked")
+  isPinned    Boolean  @default(false) @map("is_pinned")
+  isClosed    Boolean  @default(false) @map("is_closed")
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tree     Tree?            @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  creator  User             @relation("ThreadCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  posts    DiscussionPost[]
+  watchers User[]           @relation("ThreadWatchers")
+  follows  Follow[]
+
+  @@index([treeId])
+  @@index([createdBy])
+  @@index([category])
+  @@index([tags]) // GIN index for array search
+  @@map("discussion_threads")
+}
+
+// 19. Discussion Posts Table
+model DiscussionPost {
+  id        String    @id @default(uuid()) @db.Uuid
+  threadId  String    @map("thread_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  content   String    @db.Text
+  isEdited  Boolean   @default(false) @map("is_edited")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  thread      DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mentions    User[]           @relation("PostMentions")
+  attachments Media[]          @relation("PostAttachments")
+
+  @@index([threadId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("discussion_posts")
+}
+
+// 20. Suggestions Table
+enum SuggestionStatus {
+  pending
+  approved
+  rejected
+  needs_info
+}
+
+model Suggestion {
+  id             String           @id @default(uuid()) @db.Uuid
+  entityType     String           @map("entity_type") @db.VarChar(50)
+  entityId       String           @map("entity_id") @db.VarChar(255)
+  treeId         String           @map("tree_id") @db.Uuid
+  fieldName      String           @map("field_name") @db.VarChar(255)
+  currentValue   String?          @map("current_value") @db.Text
+  suggestedValue String           @map("suggested_value") @db.Text
+  evidence       String?          @db.Text
+  status         SuggestionStatus @default(pending)
+  suggestedBy    String           @map("suggested_by") @db.Uuid
+  reviewedBy     String?          @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz(6)
+  reviewNotes    String?          @map("review_notes") @db.Text
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  suggester   User    @relation("SuggestionAuthor", fields: [suggestedBy], references: [id], onDelete: Cascade)
+  reviewer    User?   @relation("SuggestionReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  tree        Tree    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  attachments Media[] @relation("SuggestionAttachments")
+
+  @@index([entityType, entityId])
+  @@index([treeId])
+  @@index([status])
+  @@index([suggestedBy])
+  @@index([reviewedBy])
+  @@map("suggestions")
+}
+
+// 21. Research Notes Table
+model ResearchNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.VarChar(255)
+  treeId     String?  @map("tree_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  title      String?  @db.VarChar(255)
+  content    String   @db.Text
+  isPrivate  Boolean  @default(true) @map("is_private")
+  notebookId String?  @map("notebook_id") @db.Uuid
+  tags       String[]
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree        Tree?     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  notebook    Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
+  attachments Media[]   @relation("ResearchNoteAttachments")
+
+  @@index([entityType, entityId])
+  @@index([treeId])
+  @@index([userId])
+  @@index([notebookId])
+  @@index([tags]) // GIN index for array search
+  @@map("research_notes")
+}
+
+// 22. Notebooks Table
+model Notebook {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  isPrivate   Boolean  @default(true) @map("is_private")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes ResearchNote[]
+
+  @@index([userId])
+  @@map("notebooks")
+}
+
+// 23. Messages Table
+model Message {
+  id          String    @id @default(uuid()) @db.Uuid
+  senderId    String    @map("sender_id") @db.Uuid
+  recipientId String?   @map("recipient_id") @db.Uuid
+  groupId     String?   @map("group_id") @db.Uuid
+  subject     String?   @db.VarChar(255)
+  content     String    @db.Text
+  isRead      Boolean   @default(false) @map("is_read")
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  isSystem    Boolean   @default(false) @map("is_system")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  sender      User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User?         @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  group       MessageGroup? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  attachments Media[]       @relation("MessageAttachments")
+
+  @@index([senderId])
+  @@index([recipientId])
+  @@index([groupId])
+  @@index([isRead])
+  @@index([createdAt])
+  @@map("messages")
+}
+
+// 24. Message Groups Table
+model MessageGroup {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  treeId      String?  @map("tree_id") @db.Uuid
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  tree     Tree?     @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  creator  User      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  members  User[]    @relation("GroupMembers")
+  messages Message[]
+
+  @@index([treeId])
+  @@index([createdBy])
+  @@map("message_groups")
+}
+
+// ============================================================================
+// USER PROFILE & FOLLOWING TABLES
+// ============================================================================
+
+// 25. User Profiles Table
+enum ProfileVisibility {
+  public
+  collaborators_only
+  private
+}
+
+enum ActivityVisibility {
+  public
+  followers_only
+  collaborators_only
+  private
+}
+
+model UserProfile {
+  id              String  @id @default(uuid()) @db.Uuid
+  userId          String  @unique @map("user_id") @db.Uuid
+  displayName     String? @map("display_name") @db.VarChar(255)
+  bio             String? @db.Text
+  location        String? @db.VarChar(255)
+  profilePhotoUrl String? @map("profile_photo_url") @db.VarChar(500)
+  coverPhotoUrl   String? @map("cover_photo_url") @db.VarChar(500)
+
+  // Research interests
+  researchSurnames    String[] @map("research_surnames")
+  researchLocations   String[] @map("research_locations")
+  researchTimePeriods String[] @map("research_time_periods")
+  researchGoals       String?  @map("research_goals") @db.Text
+
+  // Genealogy credentials
+  yearsResearching Int?     @map("years_researching")
+  specializations  String[]
+  certifications   String[]
+  languages        String[]
+
+  // Privacy settings
+  profileVisibility   ProfileVisibility  @default(collaborators_only) @map("profile_visibility")
+  activityVisibility  ActivityVisibility @default(collaborators_only) @map("activity_visibility")
+  allowDirectMessages Boolean            @default(true) @map("allow_direct_messages")
+  allowFollowing      Boolean            @default(true) @map("allow_following")
+
+  // Stats (computed/cached)
+  treesOwnedCount      Int @default(0) @map("trees_owned_count")
+  treesMaintainedCount Int @default(0) @map("trees_maintained_count")
+  contributionsCount   Int @default(0) @map("contributions_count")
+  followersCount       Int @default(0) @map("followers_count")
+  followingCount       Int @default(0) @map("following_count")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+// 26. Follows Table
+model Follow {
+  id                 String  @id @default(uuid()) @db.Uuid
+  followerId         String  @map("follower_id") @db.Uuid
+  followeeId         String? @map("followee_id") @db.Uuid
+  treeId             String? @map("tree_id") @db.Uuid
+  entityType         String? @map("entity_type") @db.VarChar(50)
+  entityId           String? @map("entity_id") @db.VarChar(255)
+  discussionThreadId String? @map("discussion_thread_id") @db.Uuid
+
+  isMuted   Boolean  @default(false) @map("is_muted")
+  isPrivate Boolean  @default(false) @map("is_private")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  follower User              @relation("Following", fields: [followerId], references: [id], onDelete: Cascade)
+  followee User?             @relation("Followers", fields: [followeeId], references: [id], onDelete: Cascade)
+  tree     Tree?             @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  thread   DiscussionThread? @relation(fields: [discussionThreadId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followeeId])
+  @@unique([followerId, treeId])
+  @@unique([followerId, entityType, entityId])
+  @@unique([followerId, discussionThreadId])
+  @@index([followerId])
+  @@index([followeeId])
+  @@index([treeId])
+  @@map("follows")
+}
+
+// ============================================================================
+// CONTENT & FEED TABLES
+// ============================================================================
+
+// 27. User Content Table
+enum ContentType {
+  research_update
+  family_story
+  research_discovery
+  collaboration_request
+  recipe
+  research_log
+}
+
+enum ContentVisibility {
+  public
+  followers_only
+  collaborators_only
+  private
+}
+
+model UserContent {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @map("user_id") @db.Uuid
+  contentType ContentType       @map("content_type")
+  title       String?           @db.VarChar(255)
+  content     String            @db.Text
+  isPublic    Boolean           @default(false) @map("is_public")
+  visibility  ContentVisibility @default(followers_only)
+
+  // Links to related entities
+  treeId     String? @map("tree_id") @db.Uuid
+  entityType String? @map("entity_type") @db.VarChar(50)
+  entityId   String? @map("entity_id") @db.VarChar(255)
+
+  // Tags for organization
+  surnames    String[]
+  locations   String[]
+  timePeriods String[] @map("time_periods")
+
+  // Engagement (cached)
+  likesCount    Int @default(0) @map("likes_count")
+  commentsCount Int @default(0) @map("comments_count")
+  sharesCount   Int @default(0) @map("shares_count")
+
+  // Recipe-specific
+  recipeIngredients  String? @map("recipe_ingredients") @db.Text
+  recipeInstructions String? @map("recipe_instructions") @db.Text
+
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree            Tree?            @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  media           Media[]          @relation("ContentMedia")
+  likes           ContentLike[]
+  contentComments ContentComment[]
+  shares          ContentShare[]
+  userFeeds       UserFeed[]
+
+  @@index([userId])
+  @@index([contentType])
+  @@index([treeId])
+  @@index([isPublic])
+  @@index([createdAt])
+  @@index([surnames]) // GIN index for array search
+  @@index([locations]) // GIN index for array search
+  @@index([timePeriods]) // GIN index for array search
+  @@map("user_content")
+}
+
+// 28. Content Likes Table
+model ContentLike {
+  id        String   @id @default(uuid()) @db.Uuid
+  contentId String   @map("content_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  content UserContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([contentId, userId])
+  @@index([contentId])
+  @@index([userId])
+  @@map("content_likes")
+}
+
+// 29. Content Comments Table
+model ContentComment {
+  id        String    @id @default(uuid()) @db.Uuid
+  contentId String    @map("content_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  parentId  String?   @map("parent_id") @db.Uuid
+  content   String    @db.Text
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  userContent UserContent      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent      ContentComment?  @relation("ContentCommentReplies", fields: [parentId], references: [id])
+  replies     ContentComment[] @relation("ContentCommentReplies")
+
+  @@index([contentId])
+  @@index([userId])
+  @@index([parentId])
+  @@map("content_comments")
+}
+
+// 30. Content Shares Table
+model ContentShare {
+  id         String   @id @default(uuid()) @db.Uuid
+  contentId  String   @map("content_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  sharedWith String?  @map("shared_with") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  content UserContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([contentId])
+  @@index([userId])
+  @@map("content_shares")
+}
+
+// 31. User Feeds Table
+model UserFeed {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  contentId  String    @map("content_id") @db.Uuid
+  sourceType String    @map("source_type") @db.VarChar(50)
+  sourceId   String    @map("source_id") @db.VarChar(255)
+  isRead     Boolean   @default(false) @map("is_read")
+  readAt     DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content UserContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([contentId])
+  @@index([sourceType, sourceId])
+  @@map("user_feeds")
+}
+
+// ============================================================================
+// NOTIFICATION & ACTIVITY TABLES
+// ============================================================================
+
+// 32. Notifications Table
+enum NotificationType {
+  comment
+  reply
+  mention
+  suggestion
+  message
+  access_request
+  activity
+  system
+  follow
+  content_like
+  content_comment
+  content_share
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String           @db.VarChar(255)
+  message   String           @db.Text
+  link      String?          @db.VarChar(500)
+  isRead    Boolean          @default(false) @map("is_read")
+  readAt    DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Related entity context (optional)
+  entityType String?  @map("entity_type") @db.VarChar(50)
+  entityId   String?  @map("entity_id") @db.VarChar(255)
+  treeId     String?  @map("tree_id") @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+  tree  Tree? @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("notifications")
+}
+
+// 33. Activities Table
+model Activity {
+  id           String   @id @default(uuid()) @db.Uuid
+  activityType String   @map("activity_type") @db.VarChar(100)
+  entityType   String?  @map("entity_type") @db.VarChar(50)
+  entityId     String?  @map("entity_id") @db.VarChar(255)
+  treeId       String   @map("tree_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  description  String   @db.Text
+  metadata     Json? // Additional data (before/after values, etc.)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tree Tree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+
+  @@index([treeId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([createdAt])
+  @@map("activities")
+}
+
+// ============================================================================
+// SUPPORTING JUNCTION TABLES
+// ============================================================================
+
+// Note: Media model needs to be added if it doesn't exist
+// For now, we'll create a placeholder or reference existing media from Go API
+// Media relations are stored as fileId + mediaId (UUIDs from Go API)
+
+// Media junction table for attachments (polymorphic)
+model Media {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileId     String   @map("file_id") @db.VarChar(255)
+  mediaId    String   @map("media_id") @db.VarChar(255)
+  entityType String   @map("entity_type") @db.VarChar(50)
+  entityId   String   @map("entity_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  // Relations
+  postAttachments         DiscussionPost[] @relation("PostAttachments")
+  suggestionAttachments   Suggestion[]     @relation("SuggestionAttachments")
+  researchNoteAttachments ResearchNote[]   @relation("ResearchNoteAttachments")
+  messageAttachments      Message[]        @relation("MessageAttachments")
+  contentMedia            UserContent[]    @relation("ContentMedia")
+
+  @@index([fileId, mediaId])
+  @@index([entityType, entityId])
+  @@map("media_attachments")
+}
+
+// ============================================================================
+// GEDCOM TREE DATA TABLES
+// These tables store the actual genealogical data parsed from GEDCOM files.
+// They mirror the Go API's PostgreSQL schema (002/003 migrations).
+// ============================================================================
+
+enum GedcomSex {
+  M
+  F
+  U
+  X
+}
+
+enum GedcomDateType {
+  EXACT
+  ABOUT
+  BEFORE
+  AFTER
+  BETWEEN
+  CALCULATED
+  ESTIMATED
+  FROM_TO
+  UNKNOWN
+}
+
+// G1. GEDCOM File Registry
+model GedcomFile {
+  id               String    @id @default(uuid()) @db.Uuid
+  fileId           String    @unique @map("file_id") @db.Text
+  name             String    @db.Text
+  originalFilename String?   @map("original_filename") @db.Text
+  gedcomPath       String?   @map("gedcom_path") @db.Text
+  individualsCount Int       @default(0) @map("individuals_count")
+  familiesCount    Int       @default(0) @map("families_count")
+  placesCount      Int       @default(0) @map("places_count")
+  datesCount       Int       @default(0) @map("dates_count")
+  eventsCount      Int       @default(0) @map("events_count")
+  notesCount       Int       @default(0) @map("notes_count")
+  sourcesCount     Int       @default(0) @map("sources_count")
+  fileSize         BigInt?   @map("file_size")
+  checksum         String?   @db.Text
+  gedcomVersion    String?   @map("gedcom_version") @db.Text
+  charset          String?   @db.Text
+  status           String    @default("uploading") @db.Text
+  parseErrors      Int       @default(0) @map("parse_errors")
+  parseWarnings    Int       @default(0) @map("parse_warnings")
+  errorMessage     String?   @map("error_message") @db.Text
+  lastAccessedAt   DateTime? @map("last_accessed_at") @db.Timestamptz(6)
+  accessCount      BigInt    @default(0) @map("access_count")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @map("updated_at") @db.Timestamptz(6)
+  parsedAt         DateTime? @map("parsed_at") @db.Timestamptz(6)
+
+  places       GedcomPlace[]
+  dates        GedcomDate[]
+  individuals  GedcomIndividual[]
+  families     GedcomFamily[]
+  events       GedcomEvent[]
+  notes        GedcomNote[]
+  sources      GedcomSource[]
+  repositories GedcomRepository[]
+  gedcomMedia  GedcomMedia[]
+  surnames     GedcomSurname[]
+  givenNames   GedcomGivenName[]
+  fileObjects  GedcomFileObject[]
+  tree         Tree?
+
+  @@index([status])
+  @@index([checksum])
+  @@index([createdAt])
+  @@map("gedcom_files")
+}
+
+// G2. Places
+model GedcomPlace {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  original  String   @db.Text
+  name      String?  @db.Text
+  county    String?  @db.Text
+  state     String?  @db.Text
+  country   String?  @db.Text
+  latitude  Decimal? @db.Decimal(10, 7)
+  longitude Decimal? @db.Decimal(10, 7)
+  hash      String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualBirthPlaces GedcomIndividual[] @relation("IndiBirthPlace")
+  individualDeathPlaces GedcomIndividual[] @relation("IndiDeathPlace")
+  familyMarriagePlaces  GedcomFamily[]     @relation("FamMarriagePlace")
+  familyDivorcePlaces   GedcomFamily[]     @relation("FamDivorcePlace")
+  events                GedcomEvent[]
+
+  @@unique([fileUuid, hash])
+  @@index([fileUuid])
+  @@index([fileUuid, country])
+  @@index([fileUuid, state])
+  @@index([fileUuid, name])
+  @@map("gedcom_places_v2")
+}
+
+// G3. Dates
+model GedcomDate {
+  id        String         @id @default(uuid()) @db.Uuid
+  fileUuid  String         @map("file_uuid") @db.Uuid
+  original  String?        @db.Text
+  dateType  GedcomDateType @default(EXACT) @map("date_type")
+  calendar  String?        @default("GREGORIAN") @db.Text
+  year      Int?
+  month     Int?
+  day       Int?
+  endYear   Int?           @map("end_year")
+  endMonth  Int?           @map("end_month")
+  endDay    Int?           @map("end_day")
+  hash      String         @db.Text
+  createdAt DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualBirthDates GedcomIndividual[] @relation("IndiBirthDate")
+  individualDeathDates GedcomIndividual[] @relation("IndiDeathDate")
+  familyMarriageDates  GedcomFamily[]     @relation("FamMarriageDate")
+  familyDivorceDates   GedcomFamily[]     @relation("FamDivorceDate")
+  events               GedcomEvent[]
+
+  @@unique([fileUuid, hash])
+  @@index([fileUuid])
+  @@index([fileUuid, year])
+  @@map("gedcom_dates_v2")
+}
+
+// G4. Surnames
+model GedcomSurname {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  surname      String   @db.Text
+  surnameLower String   @map("surname_lower") @db.Text
+  soundex      String?  @db.Text
+  metaphone    String?  @db.Text
+  frequency    Int      @default(0)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualSurnames GedcomIndividualSurname[]
+  familySurnames     GedcomFamilySurname[]
+
+  @@unique([fileUuid, surnameLower])
+  @@index([fileUuid])
+  @@index([fileUuid, surnameLower])
+  @@index([fileUuid, soundex])
+  @@index([fileUuid, frequency])
+  @@map("gedcom_surnames_v2")
+}
+
+// G5. Given Names
+model GedcomGivenName {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileUuid       String   @map("file_uuid") @db.Uuid
+  givenName      String   @map("given_name") @db.Text
+  givenNameLower String   @map("given_name_lower") @db.Text
+  frequency      Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualGivenNames GedcomIndividualGivenName[]
+
+  @@unique([fileUuid, givenNameLower])
+  @@index([fileUuid])
+  @@index([fileUuid, givenNameLower])
+  @@index([fileUuid, frequency])
+  @@map("gedcom_given_names_v2")
+}
+
+// G6. Individuals
+model GedcomIndividual {
+  id                String     @id @default(uuid()) @db.Uuid
+  fileUuid          String     @map("file_uuid") @db.Uuid
+  xref              String     @db.Text
+  fullName          String?    @map("full_name") @db.Text
+  fullNameLower     String?    @map("full_name_lower") @db.Text
+  sex               GedcomSex?
+  birthDateId       String?    @map("birth_date_id") @db.Uuid
+  birthPlaceId      String?    @map("birth_place_id") @db.Uuid
+  birthDateDisplay  String?    @map("birth_date_display") @db.Text
+  birthPlaceDisplay String?    @map("birth_place_display") @db.Text
+  birthYear         Int?       @map("birth_year")
+  deathDateId       String?    @map("death_date_id") @db.Uuid
+  deathPlaceId      String?    @map("death_place_id") @db.Uuid
+  deathDateDisplay  String?    @map("death_date_display") @db.Text
+  deathPlaceDisplay String?    @map("death_place_display") @db.Text
+  deathYear         Int?       @map("death_year")
+  isLiving          Boolean    @default(true) @map("is_living")
+  hasParents        Boolean    @default(false) @map("has_parents")
+  hasChildren       Boolean    @default(false) @map("has_children")
+  hasSpouse         Boolean    @default(false) @map("has_spouse")
+  occupation        String?    @db.Text
+  religion          String?    @db.Text
+  nationality       String?    @db.Text
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime   @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  file       GedcomFile   @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+  birthDate  GedcomDate?  @relation("IndiBirthDate", fields: [birthDateId], references: [id], onDelete: SetNull)
+  birthPlace GedcomPlace? @relation("IndiBirthPlace", fields: [birthPlaceId], references: [id], onDelete: SetNull)
+  deathDate  GedcomDate?  @relation("IndiDeathDate", fields: [deathDateId], references: [id], onDelete: SetNull)
+  deathPlace GedcomPlace? @relation("IndiDeathPlace", fields: [deathPlaceId], references: [id], onDelete: SetNull)
+
+  husbandInFamilies    GedcomFamily[]              @relation("FamilyHusband")
+  wifeInFamilies       GedcomFamily[]              @relation("FamilyWife")
+  individualEvents     GedcomIndividualEvent[]
+  individualNotes      GedcomIndividualNote[]
+  individualSources    GedcomIndividualSource[]
+  individualSurnames   GedcomIndividualSurname[]
+  individualGivenNames GedcomIndividualGivenName[]
+  individualMedia      GedcomIndividualMedia[]
+  parentAsParent       GedcomParentChild[]         @relation("PCParent")
+  parentAsChild        GedcomParentChild[]         @relation("PCChild")
+  familyChildAsChild   GedcomFamilyChild[]
+  spouseAsIndividual   GedcomSpouse[]              @relation("SpouseIndi")
+  spouseAsSpouse       GedcomSpouse[]              @relation("SpouseTarget")
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@index([fileUuid, xref])
+  @@index([fileUuid, fullNameLower])
+  @@index([fileUuid, birthYear])
+  @@index([fileUuid, deathYear])
+  @@index([fileUuid, isLiving])
+  @@index([fileUuid, sex])
+  @@map("gedcom_individuals_v2")
+}
+
+// G7. Families
+model GedcomFamily {
+  id                   String   @id @default(uuid()) @db.Uuid
+  fileUuid             String   @map("file_uuid") @db.Uuid
+  xref                 String   @db.Text
+  husbandId            String?  @map("husband_id") @db.Uuid
+  wifeId               String?  @map("wife_id") @db.Uuid
+  husbandXref          String?  @map("husband_xref") @db.Text
+  wifeXref             String?  @map("wife_xref") @db.Text
+  marriageDateId       String?  @map("marriage_date_id") @db.Uuid
+  marriagePlaceId      String?  @map("marriage_place_id") @db.Uuid
+  marriageDateDisplay  String?  @map("marriage_date_display") @db.Text
+  marriagePlaceDisplay String?  @map("marriage_place_display") @db.Text
+  marriageYear         Int?     @map("marriage_year")
+  divorceDateId        String?  @map("divorce_date_id") @db.Uuid
+  divorcePlaceId       String?  @map("divorce_place_id") @db.Uuid
+  isDivorced           Boolean  @default(false) @map("is_divorced")
+  childrenCount        Int      @default(0) @map("children_count")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  file          GedcomFile        @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+  husband       GedcomIndividual? @relation("FamilyHusband", fields: [husbandId], references: [id], onDelete: SetNull)
+  wife          GedcomIndividual? @relation("FamilyWife", fields: [wifeId], references: [id], onDelete: SetNull)
+  marriageDate  GedcomDate?       @relation("FamMarriageDate", fields: [marriageDateId], references: [id], onDelete: SetNull)
+  marriagePlace GedcomPlace?      @relation("FamMarriagePlace", fields: [marriagePlaceId], references: [id], onDelete: SetNull)
+  divorceDate   GedcomDate?       @relation("FamDivorceDate", fields: [divorceDateId], references: [id], onDelete: SetNull)
+  divorcePlace  GedcomPlace?      @relation("FamDivorcePlace", fields: [divorcePlaceId], references: [id], onDelete: SetNull)
+
+  familyEvents    GedcomFamilyEvent[]
+  familyNotes     GedcomFamilyNote[]
+  familySources   GedcomFamilySource[]
+  familySurnames  GedcomFamilySurname[]
+  familyMedia     GedcomFamilyMedia[]
+  familyChildren  GedcomFamilyChild[]
+  parentChildRels GedcomParentChild[]
+  spouses         GedcomSpouse[]
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@index([fileUuid, xref])
+  @@index([husbandId])
+  @@index([wifeId])
+  @@index([fileUuid, marriageYear])
+  @@map("gedcom_families_v2")
+}
+
+// G8. Events
+model GedcomEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  eventType  String   @map("event_type") @db.Text
+  customType String?  @map("custom_type") @db.Text
+  dateId     String?  @map("date_id") @db.Uuid
+  placeId    String?  @map("place_id") @db.Uuid
+  value      String?  @db.Text
+  cause      String?  @db.Text
+  agency     String?  @db.Text
+  sortOrder  Int      @default(0) @map("sort_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file  GedcomFile   @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+  date  GedcomDate?  @relation(fields: [dateId], references: [id], onDelete: SetNull)
+  place GedcomPlace? @relation(fields: [placeId], references: [id], onDelete: SetNull)
+
+  individualEvents GedcomIndividualEvent[]
+  familyEvents     GedcomFamilyEvent[]
+  eventNotes       GedcomEventNote[]
+  eventSources     GedcomEventSource[]
+
+  @@index([fileUuid])
+  @@index([fileUuid, eventType])
+  @@index([dateId])
+  @@index([placeId])
+  @@map("gedcom_events_v2")
+}
+
+// G9. Notes
+model GedcomNote {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  xref       String?  @db.Text
+  content    String   @db.Text
+  isTopLevel Boolean  @default(false) @map("is_top_level")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualNotes GedcomIndividualNote[]
+  familyNotes     GedcomFamilyNote[]
+  eventNotes      GedcomEventNote[]
+  sourceNotes     GedcomSourceNote[]
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@index([fileUuid, isTopLevel])
+  @@map("gedcom_notes_v2")
+}
+
+// G10. Sources
+model GedcomSource {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileUuid       String   @map("file_uuid") @db.Uuid
+  xref           String   @db.Text
+  title          String?  @db.Text
+  author         String?  @db.Text
+  abbreviation   String?  @db.Text
+  publication    String?  @db.Text
+  text           String?  @db.Text
+  repositoryXref String?  @map("repository_xref") @db.Text
+  callNumber     String?  @map("call_number") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualSources  GedcomIndividualSource[]
+  familySources      GedcomFamilySource[]
+  eventSources       GedcomEventSource[]
+  sourceNotes        GedcomSourceNote[]
+  sourceMedia        GedcomSourceMedia[]
+  sourceRepositories GedcomSourceRepository[]
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@index([fileUuid, xref])
+  @@index([fileUuid, title])
+  @@map("gedcom_sources_v2")
+}
+
+// G11. Repositories
+model GedcomRepository {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  xref      String   @db.Text
+  name      String?  @db.Text
+  address   String?  @db.Text
+  city      String?  @db.Text
+  state     String?  @db.Text
+  country   String?  @db.Text
+  phone     String?  @db.Text
+  email     String?  @db.Text
+  website   String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  sourceRepositories GedcomSourceRepository[]
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@map("gedcom_repositories_v2")
+}
+
+// G12. Media Objects
+model GedcomMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  xref      String?  @db.Text
+  fileRef   String?  @map("file_ref") @db.Text
+  form      String?  @db.Text
+  title     String?  @db.Text
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualMedia GedcomIndividualMedia[]
+  familyMedia     GedcomFamilyMedia[]
+  sourceMedia     GedcomSourceMedia[]
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@map("gedcom_media_v2")
+}
+
+// G13. Junction: Individual <-> Event
+model GedcomIndividualEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  role         String   @default("principal") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  event      GedcomEvent      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, individualId, eventId, role])
+  @@index([individualId])
+  @@index([eventId])
+  @@map("gedcom_individual_events_v2")
+}
+
+// G14. Junction: Family <-> Event
+model GedcomFamilyEvent {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  familyId  String   @map("family_id") @db.Uuid
+  eventId   String   @map("event_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family GedcomFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  event  GedcomEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, familyId, eventId])
+  @@index([familyId])
+  @@index([eventId])
+  @@map("gedcom_family_events_v2")
+}
+
+// G15. Junction: Individual <-> Note
+model GedcomIndividualNote {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  noteId       String   @map("note_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  note       GedcomNote       @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, individualId, noteId])
+  @@index([individualId])
+  @@index([noteId])
+  @@map("gedcom_individual_notes_v2")
+}
+
+// G16. Junction: Family <-> Note
+model GedcomFamilyNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  familyId  String   @map("family_id") @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family GedcomFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  note   GedcomNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, familyId, noteId])
+  @@index([familyId])
+  @@index([noteId])
+  @@map("gedcom_family_notes_v2")
+}
+
+// G17. Junction: Event <-> Note
+model GedcomEventNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  eventId   String   @map("event_id") @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  event GedcomEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  note  GedcomNote  @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, eventId, noteId])
+  @@index([eventId])
+  @@index([noteId])
+  @@map("gedcom_event_notes_v2")
+}
+
+// G18. Junction: Source <-> Note
+model GedcomSourceNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  sourceId  String   @map("source_id") @db.Uuid
+  noteId    String   @map("note_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  source GedcomSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  note   GedcomNote   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, sourceId, noteId])
+  @@index([sourceId])
+  @@index([noteId])
+  @@map("gedcom_source_notes_v2")
+}
+
+// G19. Junction: Individual <-> Source (citation)
+model GedcomIndividualSource {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  sourceId     String   @map("source_id") @db.Uuid
+  page         String?  @db.Text
+  quality      Int?
+  citationText String?  @map("citation_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  source     GedcomSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([individualId])
+  @@index([sourceId])
+  @@map("gedcom_individual_sources_v2")
+}
+
+// G20. Junction: Family <-> Source (citation)
+model GedcomFamilySource {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  familyId     String   @map("family_id") @db.Uuid
+  sourceId     String   @map("source_id") @db.Uuid
+  page         String?  @db.Text
+  quality      Int?
+  citationText String?  @map("citation_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family GedcomFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  source GedcomSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([sourceId])
+  @@map("gedcom_family_sources_v2")
+}
+
+// G21. Junction: Event <-> Source (citation)
+model GedcomEventSource {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  eventId      String   @map("event_id") @db.Uuid
+  sourceId     String   @map("source_id") @db.Uuid
+  page         String?  @db.Text
+  quality      Int?
+  citationText String?  @map("citation_text") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  event  GedcomEvent  @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  source GedcomSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@index([eventId])
+  @@index([sourceId])
+  @@map("gedcom_event_sources_v2")
+}
+
+// G22. Junction: Individual <-> Surname
+model GedcomIndividualSurname {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  surnameId    String   @map("surname_id") @db.Uuid
+  nameType     String   @default("birth") @map("name_type") @db.Text
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  surname    GedcomSurname    @relation(fields: [surnameId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, individualId, surnameId, nameType])
+  @@index([individualId])
+  @@index([surnameId])
+  @@map("gedcom_individual_surnames_v2")
+}
+
+// G23. Junction: Individual <-> Given Name
+model GedcomIndividualGivenName {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  givenNameId  String   @map("given_name_id") @db.Uuid
+  position     Int      @default(1)
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  givenName  GedcomGivenName  @relation(fields: [givenNameId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, individualId, givenNameId, position])
+  @@index([individualId])
+  @@index([givenNameId])
+  @@map("gedcom_individual_given_names_v2")
+}
+
+// G24. Junction: Family <-> Surname
+model GedcomFamilySurname {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  familyId  String   @map("family_id") @db.Uuid
+  surnameId String   @map("surname_id") @db.Uuid
+  isPrimary Boolean  @default(true) @map("is_primary")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family  GedcomFamily  @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  surname GedcomSurname @relation(fields: [surnameId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, familyId, surnameId])
+  @@index([familyId])
+  @@index([surnameId])
+  @@map("gedcom_family_surnames_v2")
+}
+
+// G25. Relationship: Parent <-> Child
+model GedcomParentChild {
+  id               String   @id @default(uuid()) @db.Uuid
+  fileUuid         String   @map("file_uuid") @db.Uuid
+  parentId         String   @map("parent_id") @db.Uuid
+  childId          String   @map("child_id") @db.Uuid
+  familyId         String?  @map("family_id") @db.Uuid
+  parentType       String?  @map("parent_type") @db.Text
+  relationshipType String   @default("biological") @map("relationship_type") @db.Text
+  pedigree         String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  parent GedcomIndividual @relation("PCParent", fields: [parentId], references: [id], onDelete: Cascade)
+  child  GedcomIndividual @relation("PCChild", fields: [childId], references: [id], onDelete: Cascade)
+  family GedcomFamily?    @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@unique([fileUuid, parentId, childId])
+  @@index([fileUuid])
+  @@index([parentId])
+  @@index([childId])
+  @@index([familyId])
+  @@map("gedcom_parent_child_v2")
+}
+
+// G26. Relationship: Family <-> Child
+model GedcomFamilyChild {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  familyId   String   @map("family_id") @db.Uuid
+  childId    String   @map("child_id") @db.Uuid
+  childXref  String?  @map("child_xref") @db.Text
+  birthOrder Int?     @map("birth_order")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family GedcomFamily     @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  child  GedcomIndividual @relation(fields: [childId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, familyId, childId])
+  @@index([familyId])
+  @@index([childId])
+  @@map("gedcom_family_children_v2")
+}
+
+// G27. Relationship: Spouses
+model GedcomSpouse {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  spouseId     String   @map("spouse_id") @db.Uuid
+  familyId     String?  @map("family_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation("SpouseIndi", fields: [individualId], references: [id], onDelete: Cascade)
+  spouse     GedcomIndividual @relation("SpouseTarget", fields: [spouseId], references: [id], onDelete: Cascade)
+  family     GedcomFamily?    @relation(fields: [familyId], references: [id], onDelete: SetNull)
+
+  @@unique([fileUuid, individualId, spouseId])
+  @@index([individualId])
+  @@index([spouseId])
+  @@index([familyId])
+  @@map("gedcom_spouses_v2")
+}
+
+// G28. Junction: Individual <-> Media
+model GedcomIndividualMedia {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  individualId String   @map("individual_id") @db.Uuid
+  mediaId      String   @map("media_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  media      GedcomMedia      @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, individualId, mediaId])
+  @@index([individualId])
+  @@index([mediaId])
+  @@map("gedcom_individual_media_v2")
+}
+
+// G29. Junction: Family <-> Media
+model GedcomFamilyMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  familyId  String   @map("family_id") @db.Uuid
+  mediaId   String   @map("media_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  family GedcomFamily @relation(fields: [familyId], references: [id], onDelete: Cascade)
+  media  GedcomMedia  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, familyId, mediaId])
+  @@index([familyId])
+  @@index([mediaId])
+  @@map("gedcom_family_media_v2")
+}
+
+// G30. Junction: Source <-> Media
+model GedcomSourceMedia {
+  id        String   @id @default(uuid()) @db.Uuid
+  fileUuid  String   @map("file_uuid") @db.Uuid
+  sourceId  String   @map("source_id") @db.Uuid
+  mediaId   String   @map("media_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  source GedcomSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  media  GedcomMedia  @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, sourceId, mediaId])
+  @@index([sourceId])
+  @@index([mediaId])
+  @@map("gedcom_source_media_v2")
+}
+
+// G31. Junction: Source <-> Repository
+model GedcomSourceRepository {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  sourceId     String   @map("source_id") @db.Uuid
+  repositoryId String   @map("repository_id") @db.Uuid
+  callNumber   String?  @map("call_number") @db.Text
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  source     GedcomSource     @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  repository GedcomRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, sourceId, repositoryId])
+  @@index([sourceId])
+  @@index([repositoryId])
+  @@map("gedcom_source_repositories_v2")
+}
+
+// G32. XREF Router Table
+model GedcomFileObject {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  xref       String   @db.Text
+  objectType String   @map("object_type") @db.Text
+  objectUuid String   @map("object_uuid") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  @@unique([fileUuid, xref])
+  @@index([fileUuid])
+  @@index([fileUuid, xref])
+  @@index([fileUuid, objectType])
+  @@map("gedcom_file_objects")
+}
