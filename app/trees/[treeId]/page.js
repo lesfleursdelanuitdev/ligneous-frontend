@@ -3,7 +3,11 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { Users, Heart, MapPin, Calendar, CalendarDays, BookOpen, FileText } from 'lucide-react';
 import { DashboardLayout } from '@/components';
+import TreeOverviewSection from '@/components/features/trees/TreeOverviewSection';
+import TreeOverviewToolbar from '@/components/features/trees/TreeOverviewToolbar';
+import TreeProfileHeader from '@/components/features/trees/TreeProfileHeader';
 import { authFetch } from '@/lib/api';
 
 export default function TreeOverviewPage() {
@@ -12,6 +16,7 @@ export default function TreeOverviewPage() {
   const [tree, setTree] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toolbarSection, setToolbarSection] = useState(null);
 
   useEffect(() => {
     if (!treeId) return;
@@ -85,58 +90,54 @@ export default function TreeOverviewPage() {
     );
   }
 
-  const statLinks = [
-    { label: 'Individuals', href: `/trees/${treeId}/individuals`, value: tree.individualsCount ?? 0 },
-    { label: 'Families', href: `/trees/${treeId}/families`, value: tree.familiesCount ?? 0 },
-    { label: 'Places', href: `/trees/${treeId}/places`, value: '—' },
-    { label: 'Sources', href: `/trees/${treeId}/sources`, value: '—' },
+  const statCards = [
+    { label: 'Individuals', href: `/trees/${treeId}/individuals`, value: tree.individualsCount ?? 0, icon: Users },
+    { label: 'Families', href: `/trees/${treeId}/families`, value: tree.familiesCount ?? 0, icon: Heart },
+    { label: 'Places', href: `/trees/${treeId}/places`, value: tree.placesCount ?? 0, icon: MapPin },
+    { label: 'Events', href: `/trees/${treeId}/events`, value: tree.eventsCount ?? 0, icon: Calendar },
+    { label: 'Dates', href: `/trees/${treeId}/dates`, value: tree.datesCount ?? 0, icon: CalendarDays },
+    { label: 'Sources', href: `/trees/${treeId}/sources`, value: tree.sourcesCount ?? 0, icon: BookOpen },
+    { label: 'Notes', href: `/trees/${treeId}/notes`, value: tree.notesCount ?? 0, icon: FileText },
   ];
 
   return (
     <DashboardLayout>
-      <div className="p-6 max-w-4xl mx-auto space-y-6">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-base-content">
-            {tree.name}
-          </h1>
-          {tree.description && (
-            <p className="text-base-content/70 mt-1">{tree.description}</p>
-          )}
-          {tree.owner && (
-            <p className="text-sm text-base-content/50 mt-1">
-              Owner: {tree.owner.name || tree.owner.username}
-            </p>
-          )}
-        </div>
+      <div className="space-y-6">
+        <TreeProfileHeader tree={tree} />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {statLinks.map(({ label, href, value }) => (
-            <Link
+        <div className="w-full bg-base-300 rounded-box border border-base-content/10 overflow-hidden">
+          <TreeOverviewToolbar
+            treeId={treeId}
+            activeSection={toolbarSection}
+            onSectionChange={setToolbarSection}
+          />
+          <div className="p-6 space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          {statCards.map(({ label, href, value, icon: Icon }) => (
+            <div
               key={label}
-              href={href}
-              className="card bg-base-200 rounded-box p-4 hover:bg-base-300 transition-colors"
+              className="card bg-base-200 rounded-box p-4 flex flex-col gap-3"
             >
-              <div className="text-2xl font-bold text-base-content">
-                {typeof value === 'number' ? value.toLocaleString() : value}
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                  <Icon className="w-5 h-5" />
+                </div>
+                <div className="text-2xl font-bold text-base-content">
+                  {(value ?? 0).toLocaleString()}
+                </div>
+                <div className="text-sm text-base-content/60">{label}</div>
               </div>
-              <div className="text-sm text-base-content/60">{label}</div>
-            </Link>
+              <Link
+                href={href}
+                className="btn btn-primary btn-sm w-full"
+              >
+                View
+              </Link>
+            </div>
           ))}
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <Link href={`/trees/${treeId}/individuals`} className="btn btn-primary">
-            View individuals
-          </Link>
-          <Link href={`/trees/${treeId}/families`} className="btn btn-outline">
-            View families
-          </Link>
-          <Link href={`/trees/${treeId}/places`} className="btn btn-ghost">
-            Places
-          </Link>
-          <Link href={`/trees/${treeId}/sources`} className="btn btn-ghost">
-            Sources
-          </Link>
+            </div>
+            <TreeOverviewSection />
+          </div>
         </div>
       </div>
     </DashboardLayout>
