@@ -37,37 +37,44 @@ export default function ListView({
         {headers.length > 0 && (
           <thead className="bg-base-200">
             <tr>
-              {headers.map((header) => (
-                <th
-                  key={header.key}
-                  scope="col"
-                  className={`
-                    px-6 py-3 text-left text-xs font-medium
-                    text-base-content/60 uppercase tracking-wider
-                    ${header.sortable && onSort ? 'cursor-pointer hover:bg-base-200' : ''}
-                  `}
-                  onClick={() => header.sortable && handleSort(header.key)}
-                >
-                  <div className="flex items-center gap-2">
-                    {header.label}
-                    {header.sortable && sortKey === header.key && (
-                      <svg
-                        className={`w-4 h-4 ${sortDirection === 'desc' ? 'rotate-180' : ''}`}
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 15l7-7 7 7"
-                        />
-                      </svg>
-                    )}
-                  </div>
-                </th>
-              ))}
+              {headers.map((header) => {
+                const isActive = header.sortable && sortKey === header.key;
+                return (
+                  <th
+                    key={header.key}
+                    scope="col"
+                    className={`
+                      px-6 py-3 text-left text-xs font-medium
+                      text-base-content/60 uppercase tracking-wider select-none
+                      ${header.sortable && onSort ? 'cursor-pointer hover:bg-base-300/50 transition-colors' : ''}
+                    `}
+                    onClick={() => header.sortable && handleSort(header.key)}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span className={isActive ? 'text-base-content font-semibold' : ''}>{header.label}</span>
+                      {header.sortable && onSort && (
+                        <svg
+                          className={`w-3.5 h-3.5 transition-all ${
+                            isActive
+                              ? `text-primary ${sortDirection === 'desc' ? 'rotate-180' : ''}`
+                              : 'text-base-content/25'
+                          }`}
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2.5}
+                            d="M5 15l7-7 7 7"
+                          />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
         )}

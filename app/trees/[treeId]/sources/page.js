@@ -1,90 +1,93 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { DashboardLayout } from '@/components';
-import { DataView } from '@/components/shared/data-display';
-import { ViewToggle } from '@/components/shared/navigation';
+import { DashboardLayout, TreePageHeader } from '@/components';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { authFetch } from '@/lib/api';
 
 export default function TreeSourcesPage() {
   const params = useParams();
   const treeId = params?.treeId;
   const [items, setItems] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('list');
+  const retryRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ search, advancedConditions, sort, sortDirection, page, perPage }) => {
     if (!treeId) return;
     try {
       setLoading(true);
       setError(null);
-      const res = await authFetch(`/api/trees/${treeId}/sources?limit=500`);
+      const qs = new URLSearchParams();
+      qs.set('limit', String(perPage));
+      qs.set('offset', String((page - 1) * perPage));
+      if (search) qs.set('search', search);
+      if (sort) qs.set('sort', sort);
+      qs.set('order', sortDirection);
+      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
+
+      const res = await authFetch(`/api/trees/${treeId}/sources?${qs}`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === 'string' ? data.error : (data?.error?.message ?? data?.message ?? 'Failed to fetch');
-        throw new Error(msg);
-      }
-      setItems(data.sources || data.items || []);
+      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch sources');
+      setItems(data.data || []);
+      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
     } catch (err) {
-      setError(err?.message && typeof err.message === 'string' ? err.message : String(err) || 'Failed to load');
+      setError(err?.message || 'Failed to load sources');
     } finally {
       setLoading(false);
     }
   }, [treeId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  if (!treeId) return (<DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>);
-
-  const headers = [{ label: 'Source', key: 'title', sortable: false }, { label: 'XREF', key: 'xref', sortable: false }];
+  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Link href={`/trees/${treeId}`} className="text-sm link link-primary mb-1 inline-block">← Tree overview</Link>
-            <h1 className="text-2xl font-bold text-base-content">Sources</h1>
-            <p className="text-base-content/60 mt-1">{items.length} sources</p>
-          </div>
-          <ViewToggle view={view} onViewChange={setView} />
-        </div>
-        {error && (
-          <div className="alert alert-error flex items-center justify-between gap-4">
-            <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => fetchData()}>Try again</button>
-          </div>
-        )}
-        {loading ? (
-          <div className="rounded-box border border-base-content/10 bg-base-200/50 p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]">
-            <span className="loading loading-spinner loading-lg text-primary" />
-            <p className="text-sm text-base-content/60">Loading sources…</p>
-          </div>
-        ) : error ? null : items.length === 0 ? (
-          <div className="card bg-base-100 border border-base-content/10 p-12 text-center rounded-box"><p className="text-base-content/60">No sources in this tree.</p></div>
-        ) : (
-          <DataView
-            view={view}
-            items={items}
-            renderCard={(row) => (
-              <div className="card bg-base-200 rounded-box p-4">
-                <div className="font-medium">{row.title ?? row.name ?? row.xref}</div>
-                <div className="text-sm text-base-content/70 font-mono">{row.xref}</div>
-              </div>
-            )}
-            renderRow={(row) => (
-              <>
-                <td className="px-6 py-4">{row.title ?? row.name ?? '—'}</td>
-                <td className="px-6 py-4 font-mono text-sm">{row.xref ?? '—'}</td>
-              </>
-            )}
-            listViewProps={{ headers }}
-            className={view === 'list' ? 'overflow-x-auto' : ''}
-          />
-        )}
+        <TreePageHeader treeId={treeId} title="Sources" subtitle={`${totalItems} sources`} />
+
+        <DataViewContainer
+          items={items}
+          loading={loading}
+          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          emptyState={{ title: 'No sources', message: 'No sources found in this tree.' }}
+          defaultView="list"
+          renderCard={(row) => (
+            <div className="card bg-base-200 rounded-box p-4">
+              <div className="font-medium">{row.title ?? row.name ?? row.xref}</div>
+              <div className="text-sm text-base-content/70 font-mono">{row.xref}</div>
+            </div>
+          )}
+          renderRow={(row) => (
+            <>
+              <td className="px-6 py-4">{row.title ?? row.name ?? '\u2014'}</td>
+              <td className="px-6 py-4 font-mono text-sm">{row.xref ?? '\u2014'}</td>
+            </>
+          )}
+          listHeaders={[
+            { label: 'Source', key: 'title', sortable: true },
+            { label: 'XREF', key: 'xref', sortable: false },
+          ]}
+          searchPlaceholder="Search sources..."
+          searchLabel="Source title"
+          advancedSearchFields={[
+            { key: 'xref', label: 'XREF' },
+            { key: 'title', label: 'Title' },
+            { key: 'author', label: 'Author' },
+          ]}
+          sortOptions={[{ value: 'title', label: 'Title' }]}
+          defaultSort="title"
+          totalItems={totalItems}
+          defaultPerPage={10}
+          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          addNewComponent={<AddNewPlaceholder message="Add new source form coming soon." />}
+          actions={[
+            { key: 'view', label: 'View', href: () => '#' },
+            { key: 'edit', label: 'Edit', href: () => '#' },
+            { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
+          ]}
+        />
       </div>
     </DashboardLayout>
   );

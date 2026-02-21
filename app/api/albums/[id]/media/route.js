@@ -6,9 +6,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
 import { requireAuth } from '@/lib/middleware';
-import { config } from '@/config';
-
-// GET - List media in album (with enrichment from Go API)
+// GET - List media in album
 export async function GET(request, { params }) {
   try {
     const { user, error, status } = await requireAuth(request);
@@ -37,7 +35,6 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Check access
     const hasAccess =
       album.userId === user.id ||
       album.albumShares.length > 0 ||
@@ -50,52 +47,13 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Fetch media details from Go API in parallel
-    const goApiUrl = config.api.goApi.baseURL;
-    const mediaPromises = album.albumMedia.map(async (am) => {
-      try {
-        const response = await fetch(
-          `${goApiUrl}/api/v1/files/${am.fileId}/media/${am.mediaId}`,
-          {
-            headers: {
-              'Authorization': request.headers.get('Authorization') || '',
-            },
-          }
-        );
-
-        if (response.ok) {
-          const data = await response.json();
-          return {
-            ...data.data,
-            sortOrder: am.sortOrder,
-            addedAt: am.addedAt,
-            albumMediaId: am.id,
-          };
-        } else {
-          // Media might have been deleted in Go API
-          return {
-            id: am.mediaId,
-            fileId: am.fileId,
-            sortOrder: am.sortOrder,
-            addedAt: am.addedAt,
-            albumMediaId: am.id,
-            error: 'Media not found in Go API',
-          };
-        }
-      } catch (err) {
-        console.error(`Error fetching media ${am.mediaId}:`, err);
-        return {
-          id: am.mediaId,
-          fileId: am.fileId,
-          sortOrder: am.sortOrder,
-          addedAt: am.addedAt,
-          albumMediaId: am.id,
-          error: 'Failed to fetch media details',
-        };
-      }
-    });
-
-    const media = await Promise.all(mediaPromises);
+    const media = album.albumMedia.map((am) => ({
+      id: am.mediaId,
+      fileId: am.fileId,
+      sortOrder: am.sortOrder,
+      addedAt: am.addedAt,
+      albumMediaId: am.id,
+    }));
 
     return NextResponse.json({ data: media });
   } catch (error) {

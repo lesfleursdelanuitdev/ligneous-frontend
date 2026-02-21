@@ -1,86 +1,92 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { DashboardLayout } from '@/components';
-import { DataView } from '@/components/shared/data-display';
-import { ViewToggle } from '@/components/shared/navigation';
+import { GitMerge } from 'lucide-react';
+import { DashboardLayout, TreePageHeader } from '@/components';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { authFetch } from '@/lib/api';
 
 export default function TreePlacesPage() {
   const params = useParams();
   const treeId = params?.treeId;
   const [items, setItems] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('list');
+  const retryRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ search, advancedConditions, sort, sortDirection, page, perPage }) => {
     if (!treeId) return;
     try {
       setLoading(true);
       setError(null);
-      const res = await authFetch(`/api/trees/${treeId}/places?limit=500`);
+      const qs = new URLSearchParams();
+      qs.set('limit', String(perPage));
+      qs.set('offset', String((page - 1) * perPage));
+      if (search) qs.set('search', search);
+      if (sort) qs.set('sort', sort);
+      qs.set('order', sortDirection);
+      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
+
+      const res = await authFetch(`/api/trees/${treeId}/places?${qs}`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === 'string' ? data.error : (data?.error?.message ?? data?.message ?? 'Failed to fetch');
-        throw new Error(msg);
-      }
-      setItems(data.places || data.items || []);
+      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch places');
+      setItems(data.data || []);
+      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
     } catch (err) {
-      setError(err?.message && typeof err.message === 'string' ? err.message : String(err) || 'Failed to load');
+      setError(err?.message || 'Failed to load places');
     } finally {
       setLoading(false);
     }
   }, [treeId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  if (!treeId) return (<DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>);
-
-  const headers = [{ label: 'Place', key: 'name', sortable: false }];
+  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Link href={`/trees/${treeId}`} className="text-sm link link-primary mb-1 inline-block">← Tree overview</Link>
-            <h1 className="text-2xl font-bold text-base-content">Places</h1>
-            <p className="text-base-content/60 mt-1">{items.length} places</p>
-          </div>
-          <ViewToggle view={view} onViewChange={setView} />
-        </div>
-        {error && (
-          <div className="alert alert-error flex items-center justify-between gap-4">
-            <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => fetchData()}>Try again</button>
-          </div>
-        )}
-        {loading ? (
-          <div className="rounded-box border border-base-content/10 bg-base-200/50 p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]">
-            <span className="loading loading-spinner loading-lg text-primary" />
-            <p className="text-sm text-base-content/60">Loading…</p>
-          </div>
-        ) : error ? null : items.length === 0 ? (
-          <div className="card bg-base-100 border border-base-content/10 p-12 text-center rounded-box"><p className="text-base-content/60">No places in this tree.</p></div>
-        ) : (
-          <DataView
-            view={view}
-            items={items}
-            renderCard={(row) => (
-              <div className="card bg-base-200 rounded-box p-4">
-                <div className="font-medium">{row.name ?? row.place ?? row.value ?? row.id}</div>
-              </div>
-            )}
-            renderRow={(row) => (
-              <td className="px-6 py-4">{row.name ?? row.place ?? row.value ?? row.id}</td>
-            )}
-            listViewProps={{ headers }}
-            className={view === 'list' ? 'overflow-x-auto' : ''}
-          />
-        )}
+        <TreePageHeader treeId={treeId} title="Places" subtitle={`${totalItems} places`} />
+
+        <DataViewContainer
+          items={items}
+          loading={loading}
+          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          emptyState={{ title: 'No places', message: 'No places found in this tree.' }}
+          defaultView="list"
+          renderCard={(row) => (
+            <div className="card bg-base-200 rounded-box p-4">
+              <div className="font-medium">{row.name ?? row.place ?? row.value ?? row.id}</div>
+            </div>
+          )}
+          renderRow={(row) => (
+            <td className="px-6 py-4">{row.name ?? row.place ?? row.value ?? row.id}</td>
+          )}
+          listHeaders={[{ label: 'Place', key: 'name', sortable: true }]}
+          searchPlaceholder="Search places..."
+          searchLabel="Place name"
+          advancedSearchFields={[
+            { key: 'original', label: 'Full place' },
+            { key: 'name', label: 'Name' },
+            { key: 'country', label: 'Country' },
+            { key: 'county', label: 'County' },
+            { key: 'state', label: 'State' },
+          ]}
+          sortOptions={[{ value: 'name', label: 'Name' }]}
+          defaultSort="name"
+          totalItems={totalItems}
+          defaultPerPage={10}
+          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          addNewComponent={<AddNewPlaceholder message="Add new place form coming soon." />}
+          extraTabs={[
+            { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge places form coming soon." />, icon: GitMerge },
+          ]}
+          actions={[
+            { key: 'view', label: 'View', href: () => '#' },
+            { key: 'edit', label: 'Edit', href: () => '#' },
+            { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
+          ]}
+        />
       </div>
     </DashboardLayout>
   );

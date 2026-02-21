@@ -1,102 +1,164 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { Users, Heart, MapPin, Calendar, BookOpen, FileText } from 'lucide-react';
 import { DashboardLayout } from '@/components';
+import { DataViewContainer } from '@/components/shared/data-display';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authFetch } from '@/lib/api';
+
+function StatItem({ icon: Icon, value, label }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+      <span>{(value ?? 0).toLocaleString()} {label}</span>
+    </div>
+  );
+}
+
+function formatDate(dateString) {
+  if (!dateString) return 'N/A';
+  return new Date(dateString).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function AdminTreeCard({ tree }) {
+  const {
+    individualsCount = 0,
+    familiesCount = 0,
+    placesCount = 0,
+    eventsCount = 0,
+    sourcesCount = 0,
+    notesCount = 0,
+  } = tree;
+  return (
+    <div className="card bg-base-100 border border-base-content/10 overflow-hidden">
+      <div className="p-4 border-b border-base-content/10">
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <Link href={`/admin/trees/${tree.id}`} className="text-lg font-semibold link link-primary">
+            {tree.name}
+          </Link>
+          <span className={`badge badge-sm ${tree.isPublic ? 'badge-success' : 'badge-error'}`}>
+            {tree.isPublic ? 'Public' : 'Private'}
+          </span>
+        </div>
+        <p className="text-sm text-base-content/60">
+          File ID: <code className="bg-base-200 px-1 rounded">{tree.fileId}</code>
+        </p>
+        {tree.description && (
+          <p className="text-sm text-base-content/70 mt-2 line-clamp-2">{tree.description}</p>
+        )}
+      </div>
+      <div className="px-4 py-3 grid grid-cols-3 gap-x-3 gap-y-2 text-sm text-base-content/70 border-b border-base-content/10">
+        <StatItem icon={Users} value={individualsCount} label="people" />
+        <StatItem icon={Heart} value={familiesCount} label="families" />
+        <StatItem icon={MapPin} value={placesCount} label="places" />
+        <StatItem icon={Calendar} value={eventsCount} label="events" />
+        <StatItem icon={BookOpen} value={sourcesCount} label="sources" />
+        <StatItem icon={FileText} value={notesCount} label="notes" />
+      </div>
+      <div className="p-4 bg-base-200 grid grid-cols-2 gap-3 text-xs">
+        <div>
+          <div className="text-base-content/60 mb-0.5">Owners</div>
+          <div className="flex flex-wrap gap-1">
+            {(tree.owners || []).slice(0, 2).map((o) => (
+              <span key={o.id} className={`badge badge-xs ${o.isPrimary ? 'badge-secondary' : 'badge-ghost'}`}>
+                {o.isPrimary && '👑 '}{o.username}
+              </span>
+            ))}
+            {(tree.owners?.length || 0) > 2 && (
+              <span className="text-base-content/60">+{tree.owners.length - 2}</span>
+            )}
+          </div>
+        </div>
+        <div>
+          <div className="text-base-content/60 mb-0.5">Pending</div>
+          <span className="text-base-content/70">
+            {(tree.counts?.pendingRequests ?? 0)} requests, {(tree.counts?.activeInvitations ?? 0)} invites
+          </span>
+        </div>
+      </div>
+      <div className="px-4 py-2 text-xs text-base-content/60 border-t border-base-content/10">
+        Created {formatDate(tree.createdAt)} • Updated {formatDate(tree.updatedAt)}
+      </div>
+    </div>
+  );
+}
 
 export default function AdminTreesPage() {
   const { isReady, isSuperuser } = useRequireAuth({
     requireSuperuser: true,
     superuserRedirectTo: '/dashboard',
   });
-  
-  const [trees, setTrees] = useState([]);
+
+  const [items, setItems] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 0 });
-  const [search, setSearch] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState('all');
+  const [actionLoading, setActionLoading] = useState(false);
+  const retryRef = useRef(null);
+  const latestParams = useRef(null);
 
-  const fetchTrees = useCallback(async () => {
+  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
     try {
       setLoading(true);
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-      });
-      if (search) params.set('search', search);
-      if (visibilityFilter !== 'all') params.set('visibility', visibilityFilter);
+      setError(null);
 
-      const response = await authFetch(`/api/admin/trees?${params}`);
-      const data = await response.json();
+      const qs = new URLSearchParams();
+      qs.set('page', String(page));
+      qs.set('limit', String(perPage));
+      if (search) qs.set('search', search);
+      if (filters?.visibility && filters.visibility !== 'all') qs.set('visibility', filters.visibility);
+      if (sort) qs.set('sort', sort);
+      qs.set('order', sortDirection);
+      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to fetch trees');
-      }
+      const res = await authFetch(`/api/admin/trees?${qs}`);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to fetch trees');
 
-      setTrees(data.trees);
-      setPagination(prev => ({ ...prev, ...data.pagination }));
+      setItems(data.trees || []);
+      setTotalItems(data.pagination?.total ?? 0);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, search, visibilityFilter]);
+  }, []);
 
-  useEffect(() => {
-    if (!isReady || !isSuperuser) return;
-    fetchTrees();
-  }, [isReady, isSuperuser, fetchTrees]);
+  const refetch = () => {
+    if (latestParams.current) fetchData(latestParams.current);
+  };
 
   const handleToggleVisibility = async (tree) => {
     try {
-      const response = await authFetch(`/api/admin/trees/${tree.id}`, {
+      const res = await authFetch(`/api/admin/trees/${tree.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isPublic: !tree.isPublic }),
       });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update tree');
-      }
-
-      fetchTrees();
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update tree');
+      refetch();
     } catch (err) {
       alert(err.message);
     }
   };
 
   const handleDeleteTree = async (tree) => {
-    if (!confirm(`Are you sure you want to DELETE "${tree.name}"?\n\nThis will remove ALL associated data including:\n- Owners & Maintainers\n- Permissions\n- Access Requests\n- Invitation Links\n\nThis action CANNOT be undone!`)) {
-      return;
-    }
-
+    if (!confirm(`Are you sure you want to DELETE "${tree.name}"?\n\nThis will remove ALL associated data. This action CANNOT be undone!`)) return;
     try {
-      const response = await authFetch(`/api/admin/trees/${tree.id}`, {
-        method: 'DELETE',
-      });
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to delete tree');
-      }
-
-      fetchTrees();
+      const res = await authFetch(`/api/admin/trees/${tree.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete tree');
+      refetch();
     } catch (err) {
       alert(err.message);
     }
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
   };
 
   if (!isReady) {
@@ -110,248 +172,97 @@ export default function AdminTreesPage() {
     );
   }
 
-  if (!isSuperuser) {
-    return null;
-  }
+  if (!isSuperuser) return null;
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-base-content">🌳 Tree Management</h1>
+            <h1 className="text-2xl font-bold text-base-content">Tree Management</h1>
             <p className="text-base-content/60 text-sm mt-1">
               Manage all family trees, their owners, and permissions
             </p>
           </div>
           <div className="text-sm text-base-content/60">
-            Total: <span className="font-semibold text-base-content">{pagination.total}</span> trees
+            Total: <span className="font-semibold text-base-content">{totalItems}</span> trees
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-base-100 rounded-lg p-4 border border-base-content/10 flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <input
-              type="text"
-              placeholder="Search by name or file ID..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              className="input w-full"
-            />
-          </div>
-          <div className="flex gap-2">
-            <select
-              value={visibilityFilter}
-              onChange={(e) => {
-                setVisibilityFilter(e.target.value);
-                setPagination(prev => ({ ...prev, page: 1 }));
-              }}
-              className="input"
-            >
-              <option value="all">All Visibility</option>
-              <option value="public">Public</option>
-              <option value="private">Private</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Trees List */}
-        <div className="space-y-4">
-          {loading ? (
-            <div className="bg-base-100 rounded-lg p-8 border border-base-content/10 text-center">
-              <span className="loading loading-spinner text-primary loading-md" />
-              <p className="mt-2 text-base-content/60">Loading trees...</p>
-            </div>
-          ) : error ? (
-            <div className="bg-base-100 rounded-lg p-8 border border-base-content/10 text-center text-error">
-              {error}
-            </div>
-          ) : trees.length === 0 ? (
-            <div className="bg-base-100 rounded-lg p-8 border border-base-content/10 text-center">
-              <span className="text-4xl">🌲</span>
-              <p className="mt-2 text-base-content/60">No trees found</p>
-            </div>
-          ) : (
-            trees.map((tree) => (
-              <div 
-                key={tree.id} 
-                className="bg-base-100 rounded-lg border border-base-content/10 overflow-hidden"
-              >
-                {/* Tree Header */}
-                <div className="p-4 border-b border-base-content/10">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <Link 
-                          href={`/admin/trees/${tree.id}`}
-                          className="text-lg font-semibold link link-primary"
-                        >
-                          {tree.name}
-                        </Link>
-                        <span className={`badge badge-sm ${tree.isPublic ? 'badge-success' : 'badge-error'}`}>
-                          {tree.isPublic ? '🌍 Public' : '🔒 Private'}
-                        </span>
-                      </div>
-                      <p className="text-sm text-base-content/60 mt-1">
-                        File ID: <code className="bg-base-200 px-1 rounded">{tree.fileId}</code>
-                      </p>
-                      {tree.description && (
-                        <p className="text-sm text-base-content/70 mt-2 line-clamp-2">
-                          {tree.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleVisibility(tree)}
-                        className={`btn btn-xs ${tree.isPublic ? 'btn-warning' : 'btn-success'}`}
-                      >
-                        Make {tree.isPublic ? 'Private' : 'Public'}
-                      </button>
-                      <Link
-                        href={`/admin/trees/${tree.id}`}
-                        className="btn btn-primary btn-xs"
-                      >
-                        Manage
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteTree(tree)}
-                        className="btn btn-error btn-xs"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </div>
+        <DataViewContainer
+          items={items}
+          loading={loading}
+          error={error ? { message: error, onRetry: refetch } : null}
+          emptyState={{ title: 'No trees found', message: 'Try adjusting your search or filters.' }}
+          defaultView="list"
+          renderCard={(tree) => <AdminTreeCard tree={tree} />}
+          renderRow={(tree) => (
+            <>
+              <td className="px-4 py-3">
+                <div>
+                  <Link href={`/admin/trees/${tree.id}`} className="font-medium link link-primary">
+                    {tree.name}
+                  </Link>
+                  <div className="text-sm text-base-content/60">File ID: {tree.fileId}</div>
                 </div>
-
-                {/* Tree Stats */}
-                <div className="p-4 bg-base-200 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {/* Owners */}
-                  <div>
-                    <div className="text-xs text-base-content/60 mb-1">Owners</div>
-                    <div className="flex flex-wrap gap-1">
-                      {tree.owners.length === 0 ? (
-                        <span className="text-sm text-base-content/60">None</span>
-                      ) : (
-                        tree.owners.slice(0, 3).map((owner) => (
-                          <span 
-                            key={owner.id}
-                            className={`badge badge-xs ${owner.isPrimary ? 'badge-secondary' : 'badge-ghost'}`}
-                          >
-                            {owner.isPrimary && '👑 '}{owner.username}
-                          </span>
-                        ))
-                      )}
-                      {tree.owners.length > 3 && (
-                        <span className="text-xs text-base-content/60">
-                          +{tree.owners.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Maintainers */}
-                  <div>
-                    <div className="text-xs text-base-content/60 mb-1">Maintainers</div>
-                    <div className="flex flex-wrap gap-1">
-                      {tree.maintainers.length === 0 ? (
-                        <span className="text-sm text-base-content/60">None</span>
-                      ) : (
-                        tree.maintainers.slice(0, 3).map((maintainer) => (
-                          <span 
-                            key={maintainer.id}
-                            className="badge badge-xs badge-info"
-                          >
-                            🛠️ {maintainer.username}
-                          </span>
-                        ))
-                      )}
-                      {tree.maintainers.length > 3 && (
-                        <span className="text-xs text-base-content/60">
-                          +{tree.maintainers.length - 3} more
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Counts */}
-                  <div>
-                    <div className="text-xs text-base-content/60 mb-1">Stats</div>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      <span className="text-base-content/70">
-                        {tree.counts.permissions} perms
-                      </span>
-                      <span className="text-base-content/70">
-                        {tree.counts.linkedUsers} links
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Pending */}
-                  <div>
-                    <div className="text-xs text-base-content/60 mb-1">Pending</div>
-                    <div className="flex flex-wrap gap-2 text-xs">
-                      {tree.counts.pendingRequests > 0 && (
-                        <span className="text-warning font-medium">
-                          {tree.counts.pendingRequests} requests
-                        </span>
-                      )}
-                      {tree.counts.activeInvitations > 0 && (
-                        <span className="text-info">
-                          {tree.counts.activeInvitations} invites
-                        </span>
-                      )}
-                      {tree.counts.pendingRequests === 0 && tree.counts.activeInvitations === 0 && (
-                        <span className="text-base-content/60">None</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="px-4 py-2 text-xs text-base-content/60 border-t border-base-content/10">
-                  Created {formatDate(tree.createdAt)} • Updated {formatDate(tree.updatedAt)}
-                </div>
-              </div>
-            ))
+              </td>
+              <td className="px-4 py-3 text-sm text-base-content/70">
+                {(tree.individualsCount ?? 0).toLocaleString()} people
+              </td>
+              <td className="px-4 py-3">
+                <span className={`badge badge-sm ${tree.isPublic ? 'badge-success' : 'badge-error'}`}>
+                  {tree.isPublic ? 'Public' : 'Private'}
+                </span>
+              </td>
+              <td className="px-4 py-3 text-sm text-base-content/70">
+                {(tree.owners || []).map((o) => o.username).join(', ') || '—'}
+              </td>
+              <td className="px-4 py-3 text-sm text-base-content/60">
+                {tree.counts?.pendingRequests ?? 0} req, {tree.counts?.activeInvitations ?? 0} invites
+              </td>
+              <td className="px-4 py-3 text-sm text-base-content/60">{formatDate(tree.updatedAt)}</td>
+            </>
           )}
-        </div>
-
-        {/* Pagination */}
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between bg-base-100 rounded-lg p-4 border border-base-content/10">
-            <div className="text-sm text-base-content/60">
-              Page {pagination.page} of {pagination.totalPages}
-            </div>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                disabled={pagination.page === 1}
-                className="btn btn-ghost btn-sm"
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                disabled={pagination.page === pagination.totalPages}
-                className="btn btn-ghost btn-sm"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+          listHeaders={[
+            { label: 'Tree', key: 'name', sortable: true },
+            { label: 'People', key: 'individuals_count', sortable: false },
+            { label: 'Visibility', key: 'visibility', sortable: false },
+            { label: 'Owners', key: 'owners', sortable: false },
+            { label: 'Pending', key: 'pending', sortable: false },
+            { label: 'Updated', key: 'updatedAt', sortable: true },
+          ]}
+          searchPlaceholder="Search by name or file ID..."
+          searchLabel="Name or file ID"
+          advancedSearchFields={[
+            { key: 'name', label: 'Name' },
+            { key: 'fileId', label: 'File ID' },
+          ]}
+          filters={[
+            { key: 'visibility', label: 'Visibility', type: 'select', options: [
+              { value: 'public', label: 'Public' },
+              { value: 'private', label: 'Private' },
+            ]},
+          ]}
+          sortOptions={[
+            { value: 'name', label: 'Name' },
+            { value: 'createdAt', label: 'Created' },
+            { value: 'updatedAt', label: 'Updated' },
+          ]}
+          defaultSort="updatedAt"
+          defaultSortDirection="desc"
+          totalItems={totalItems}
+          actions={[
+            { key: 'view', label: 'Manage', href: (t) => `/admin/trees/${t.id}` },
+            { key: 'toggle', label: 'Toggle visibility', onClick: (t) => !actionLoading && handleToggleVisibility(t) },
+            { key: 'delete', label: 'Delete', variant: 'danger', onClick: (t) => !actionLoading && handleDeleteTree(t) },
+          ]}
+          onParamsChange={(p) => {
+            latestParams.current = p;
+            retryRef.current = () => fetchData(p);
+            fetchData(p);
+          }}
+        />
       </div>
     </DashboardLayout>
   );
 }
-

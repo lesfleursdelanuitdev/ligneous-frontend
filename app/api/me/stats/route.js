@@ -48,7 +48,7 @@ export async function GET(request) {
       }),
     ]);
 
-    // Get total individuals and families count across all owned trees
+    // Get total individuals and families count from GedcomFile (lookup by Tree.fileId)
     const ownedTrees = await prisma.tree.findMany({
       where: {
         owners: {
@@ -58,23 +58,20 @@ export async function GET(request) {
       select: { fileId: true },
     });
 
-    // Fetch stats from Go API for each tree
-    const goApiUrl = process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8090';
+    const fileIds = ownedTrees.map((t) => t.fileId).filter(Boolean);
+    const gedcomFiles =
+      fileIds.length > 0
+        ? await prisma.gedcomFile.findMany({
+            where: { fileId: { in: fileIds } },
+            select: { individualsCount: true, familiesCount: true },
+          })
+        : [];
+
     let totalIndividuals = 0;
     let totalFamilies = 0;
-
-    for (const tree of ownedTrees) {
-      try {
-        const goResponse = await fetch(`${goApiUrl}/api/v1/files/${tree.fileId}`);
-        if (goResponse.ok) {
-          const goData = await goResponse.json();
-          const fileInfo = goData.data;
-          totalIndividuals += fileInfo.individuals_count || 0;
-          totalFamilies += fileInfo.families_count || 0;
-        }
-      } catch (error) {
-        console.error(`Failed to fetch stats for tree ${tree.fileId}:`, error.message);
-      }
+    for (const gf of gedcomFiles) {
+      totalIndividuals += gf.individualsCount ?? 0;
+      totalFamilies += gf.familiesCount ?? 0;
     }
 
     // Get collaborators (unique users who have access to trees user owns)

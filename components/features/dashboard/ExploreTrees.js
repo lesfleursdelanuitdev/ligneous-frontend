@@ -50,6 +50,10 @@ export default function ExploreTrees({
           isPublic: tree.isPublic,
           individualsCount: tree.individualsCount || 0,
           familiesCount: tree.familiesCount || 0,
+          placesCount: tree.placesCount || 0,
+          eventsCount: tree.eventsCount || 0,
+          sourcesCount: tree.sourcesCount || 0,
+          notesCount: tree.notesCount || 0,
           parseStatus: tree.parseStatus,
           fileId: tree.fileId,
           owner: primaryOwner ? {

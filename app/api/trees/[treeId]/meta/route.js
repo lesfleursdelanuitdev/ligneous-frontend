@@ -1,15 +1,13 @@
 /**
  * GET /api/trees/[treeId]/meta
  * Returns tree metadata (name, description, counts) with read permission check.
+ * All data comes from the local database (no Go API dependency).
  */
 
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/middleware';
-import { checkTreeAccessForProxy, getFileIdFromTreeId } from '@/lib/tree-access';
+import { checkTreeAccessForProxy } from '@/lib/tree-access';
 import { prisma } from '@/lib/database/prisma';
-import { config } from '@/config/index.js';
-
-const GO_API_URL = config.api?.goApi?.baseURL || process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8090';
 
 export async function GET(request, { params }) {
   try {
@@ -23,10 +21,7 @@ export async function GET(request, { params }) {
 
     const hasAccess = await checkTreeAccessForProxy(userId, treeId, 'read');
     if (!hasAccess) {
-      return NextResponse.json(
-        { error: 'Forbidden: You do not have access to this tree' },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: 'Forbidden: You do not have access to this tree' }, { status: 403 });
     }
 
     const tree = await prisma.tree.findUnique({
@@ -45,23 +40,21 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Tree not found' }, { status: 404 });
     }
 
-    let individualsCount = 0;
-    let familiesCount = 0;
-
-    try {
-      const goRes = await fetch(`${GO_API_URL}/api/v1/files/${tree.fileId}`, {
-        next: { revalidate: 60 },
-      });
-      if (goRes.ok) {
-        const goData = await goRes.json();
-        const fileInfo = goData.data || goData;
-        individualsCount = fileInfo.individuals_count ?? 0;
-        familiesCount = fileInfo.families_count ?? 0;
-      }
-    } catch (e) {
-      console.warn('Go API stats fetch failed for tree', treeId, e.message);
-    }
-
+    const gf = tree.fileId
+      ? await prisma.gedcomFile.findUnique({
+          where: { fileId: tree.fileId },
+          select: {
+            individualsCount: true,
+            familiesCount: true,
+            placesCount: true,
+            datesCount: true,
+            eventsCount: true,
+            notesCount: true,
+            sourcesCount: true,
+            status: true,
+          },
+        })
+      : null;
     const primaryOwner = tree.owners?.find((o) => o.isPrimary)?.user || tree.owners?.[0]?.user;
 
     return NextResponse.json({
@@ -72,8 +65,14 @@ export async function GET(request, { params }) {
         name: tree.name,
         description: tree.description,
         isPublic: tree.isPublic,
-        individualsCount,
-        familiesCount,
+        individualsCount: gf?.individualsCount ?? 0,
+        familiesCount: gf?.familiesCount ?? 0,
+        placesCount: gf?.placesCount ?? 0,
+        datesCount: gf?.datesCount ?? 0,
+        eventsCount: gf?.eventsCount ?? 0,
+        notesCount: gf?.notesCount ?? 0,
+        sourcesCount: gf?.sourcesCount ?? 0,
+        parseStatus: gf?.status ?? 'unknown',
         owner: primaryOwner
           ? { id: primaryOwner.id, username: primaryOwner.username, name: primaryOwner.name }
           : null,
@@ -83,9 +82,6 @@ export async function GET(request, { params }) {
     });
   } catch (error) {
     console.error('Tree meta error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 });
   }
 }

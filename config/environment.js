@@ -19,18 +19,17 @@ function getEnv(key, defaultValue) {
 export const env = {
   // Node environment
   NODE_ENV: getEnv('NODE_ENV', 'development'),
-  
+
   // Database
   DATABASE_URL: getEnv('DATABASE_URL'),
-  
+
   // JWT Configuration
   JWT_SECRET: getEnv('JWT_SECRET', 'your-secret-key-change-in-production'),
   JWT_EXPIRES_IN: getEnv('JWT_EXPIRES_IN', '7d'),
-  
+
   // API URLs
-  GO_API_URL: getEnv('GO_API_URL') || getEnv('NEXT_PUBLIC_GO_API_URL', 'http://localhost:8090'),
   NEXT_PUBLIC_API_URL: getEnv('NEXT_PUBLIC_API_URL', 'http://localhost:4000/api'),
-  
+
   // Environment flags
   isDevelopment: getEnv('NODE_ENV') === 'development',
   isProduction: getEnv('NODE_ENV') === 'production',
@@ -45,14 +44,10 @@ export function getClientEnv() {
   if (typeof window === 'undefined') {
     return {
       NEXT_PUBLIC_API_URL: env.NEXT_PUBLIC_API_URL,
-      NEXT_PUBLIC_GO_API_URL: env.GO_API_URL,
     };
   }
-  
-  // In browser, try to get from Next.js injected data first
+
   return {
     NEXT_PUBLIC_API_URL: window.__NEXT_DATA__?.env?.NEXT_PUBLIC_API_URL || env.NEXT_PUBLIC_API_URL,
-    NEXT_PUBLIC_GO_API_URL: window.__NEXT_DATA__?.env?.NEXT_PUBLIC_GO_API_URL || env.GO_API_URL,
   };
 }
-

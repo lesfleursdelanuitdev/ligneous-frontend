@@ -1,26 +1,32 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DashboardLayout, PersonCard } from '@/components';
-import { DataView } from '@/components/shared/data-display';
-import { ViewToggle } from '@/components/shared/navigation';
+import { GitMerge } from 'lucide-react';
+import { DashboardLayout, PersonCard, TreePageHeader } from '@/components';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { authFetch } from '@/lib/api';
+
+function stripGedcomSlashes(name) {
+  if (!name) return name;
+  return name.replace(/\//g, '').replace(/\s+/g, ' ').trim();
+}
 
 function mapIndividualFromApi(indi, treeId) {
   return {
     id: indi.xref,
     xref: indi.xref,
-    name: indi.name,
-    givenName: indi.given_name,
-    surname: indi.surname,
-    birthDate: indi.birth_date,
-    birthPlace: indi.birth_place,
-    deathDate: indi.death_date,
-    deathPlace: indi.death_place,
+    name: stripGedcomSlashes(indi.fullName),
+    birthDate: indi.birthDateDisplay,
+    birthPlace: indi.birthPlaceDisplay,
+    deathDate: indi.deathDateDisplay,
+    deathPlace: indi.deathPlaceDisplay,
     gender: indi.sex,
-    isLiving: indi.living,
+    isLiving: indi.isLiving,
+    hasParents: indi.hasParents,
+    hasChildren: indi.hasChildren,
+    hasSpouse: indi.hasSpouse,
     treeId,
   };
 }
@@ -28,55 +34,51 @@ function mapIndividualFromApi(indi, treeId) {
 export default function TreeIndividualsPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const [individuals, setIndividuals] = useState([]);
-  const [meta, setMeta] = useState({ total: 0, limit: 100, offset: 0 });
+  const [items, setItems] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('card');
+  const retryRef = useRef(null);
 
-  const fetchIndividuals = useCallback(async () => {
+  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
     if (!treeId) return;
     try {
       setLoading(true);
       setError(null);
-      const res = await authFetch(
-        `/api/trees/${treeId}/individuals?limit=500&offset=0`
-      );
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        const msg = typeof data?.error === 'string' ? data.error : (data?.error?.message ?? data?.message ?? 'Failed to fetch individuals');
-        throw new Error(msg);
+      const qs = new URLSearchParams();
+      qs.set('limit', String(perPage));
+      qs.set('offset', String((page - 1) * perPage));
+      if (search) qs.set('search', search);
+      if (sort) qs.set('sort', sort);
+      qs.set('order', sortDirection);
+      if (filters.sex) qs.set('sex', filters.sex);
+      if (filters.living) qs.set('living', filters.living);
+      if (filters.has_children) qs.set('has_children', filters.has_children);
+      if (filters.has_spouse) qs.set('has_spouse', filters.has_spouse);
+      if (filters.birth_year) qs.set('birth_year', filters.birth_year);
+      if (filters.birth_place) qs.set('birth_place', filters.birth_place);
+      if (advancedConditions?.length > 0) {
+        qs.set('advanced_conditions', JSON.stringify(advancedConditions));
       }
 
-      const list = (data.individuals || []).map((i) => mapIndividualFromApi(i, treeId));
-      setIndividuals(list);
-      setMeta(data.meta || { total: list.length, limit: 500, offset: 0 });
+      const res = await authFetch(`/api/trees/${treeId}/individuals?${qs}`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch individuals');
+      }
+      setItems((data.data || []).map((i) => mapIndividualFromApi(i, treeId)));
+      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
     } catch (err) {
-      const msg = err?.message && typeof err.message === 'string' ? err.message : String(err);
-      setError(msg || 'Failed to load individuals');
+      setError(err?.message || 'Failed to load individuals');
     } finally {
       setLoading(false);
     }
   }, [treeId]);
 
-  useEffect(() => {
-    fetchIndividuals();
-  }, [fetchIndividuals]);
-
-  const listHeaders = [
-    { label: 'Name', key: 'name', sortable: false },
-    { label: 'Birth', key: 'birthDate', sortable: false },
-    { label: 'Death', key: 'deathDate', sortable: false },
-    { label: 'Sex', key: 'gender', sortable: false },
-  ];
-
   if (!treeId) {
     return (
       <DashboardLayout>
-        <div className="p-6">
-          <p className="text-base-content/60">Missing tree ID.</p>
-        </div>
+        <div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div>
       </DashboardLayout>
     );
   }
@@ -84,74 +86,80 @@ export default function TreeIndividualsPage() {
   return (
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Link
-              href={`/trees/${treeId}`}
-              className="text-sm link link-primary mb-1 inline-block"
-            >
-              ← Tree overview
-            </Link>
-            <h1 className="text-2xl font-bold text-base-content">
-              Individuals
-            </h1>
-            <p className="text-base-content/60 mt-1">
-              {meta.total} people in this tree
-            </p>
-          </div>
-          <ViewToggle view={view} onViewChange={setView} />
-        </div>
+        <TreePageHeader
+          treeId={treeId}
+          title="Individuals"
+          subtitle={`${totalItems} people in this tree`}
+        />
 
-        {error && (
-          <div className="alert alert-error flex items-center justify-between gap-4">
-            <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => fetchIndividuals()}>
-              Try again
-            </button>
-          </div>
-        )}
-
-        {loading ? (
-          <div className="rounded-box border border-base-content/10 bg-base-200/50 p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]">
-            <span className="loading loading-spinner loading-lg text-primary" />
-            <p className="text-sm text-base-content/60">Loading individuals…</p>
-          </div>
-        ) : error ? null : individuals.length === 0 ? (
-          <div className="card bg-base-100 border border-base-content/10 p-12 text-center rounded-box">
-            <p className="text-base-content/60">No individuals in this tree.</p>
-          </div>
-        ) : (
-          <DataView
-            view={view}
-            items={individuals}
-            renderCard={(person) => (
-              <PersonCard person={person} treeId={treeId} />
-            )}
-            renderRow={(person) => (
-              <>
-                <td className="px-6 py-4">
-                  <Link
-                    href={`/trees/${treeId}/individuals/${person.id}`}
-                    className="link link-primary font-medium"
-                  >
-                    {person.name || `${person.givenName || ''} ${person.surname || ''}`.trim() || person.xref}
-                  </Link>
-                </td>
-                <td className="px-6 py-4 text-base-content/70 text-sm">
-                  {person.birthDate || '—'}
-                </td>
-                <td className="px-6 py-4 text-base-content/70 text-sm">
-                  {person.deathDate || '—'}
-                </td>
-                <td className="px-6 py-4 text-base-content/70 text-sm">
-                  {person.gender || '—'}
-                </td>
-              </>
-            )}
-            listViewProps={{ headers: listHeaders }}
-            className={view === 'list' ? 'overflow-x-auto' : ''}
-          />
-        )}
+        <DataViewContainer
+          items={items}
+          loading={loading}
+          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          emptyState={{ title: 'No individuals', message: 'No individuals found in this tree.' }}
+          defaultView="card"
+          renderCard={(person) => <PersonCard person={person} treeId={treeId} />}
+          renderRow={(person) => (
+            <>
+              <td className="px-6 py-4">
+                <Link href={`/trees/${treeId}/individuals/${person.id}`} className="link link-primary font-medium">
+                  {person.name || person.xref}
+                </Link>
+              </td>
+              <td className="px-6 py-4 text-base-content/70 text-sm">{person.birthDate || '—'}</td>
+              <td className="px-6 py-4 text-base-content/70 text-sm">{person.deathDate || '—'}</td>
+              <td className="px-6 py-4 text-base-content/70 text-sm">{person.gender || '—'}</td>
+            </>
+          )}
+          listHeaders={[
+            { label: 'Name', key: 'name', sortable: true },
+            { label: 'Birth', key: 'birth_year', sortable: true },
+            { label: 'Death', key: 'death_year', sortable: true },
+            { label: 'Sex', key: 'sex', sortable: false },
+          ]}
+          searchPlaceholder="Search individuals by name..."
+          searchLabel="Name"
+          advancedSearchFields={[
+            { key: 'name', label: 'Name' },
+            { key: 'birth_place', label: 'Birth Place' },
+            { key: 'death_place', label: 'Death Place' },
+            { key: 'sex', label: 'Sex' },
+            { key: 'birth_year', label: 'Birth Year' },
+            { key: 'death_year', label: 'Death Year' },
+            { key: 'living', label: 'Living' },
+            { key: 'has_children', label: 'Has Children' },
+            { key: 'has_spouse', label: 'Has Spouse' },
+          ]}
+          filters={[
+            { key: 'sex', label: 'Sex', type: 'select', options: [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }, { value: 'U', label: 'Unknown' }] },
+            { key: 'living', label: 'Living', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+            { key: 'has_children', label: 'Has Children', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+            { key: 'has_spouse', label: 'Has Spouse', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+            { key: 'birth_place', label: 'Birth Place', type: 'text' },
+          ]}
+          sortOptions={[
+            { value: 'name', label: 'Name' },
+            { value: 'birth_year', label: 'Birth Year' },
+            { value: 'death_year', label: 'Death Year' },
+          ]}
+          defaultSort="name"
+          defaultSortDirection="asc"
+          totalItems={totalItems}
+          defaultPerPage={10}
+          onParamsChange={(p) => {
+            retryRef.current = () => fetchData(p);
+            fetchData(p);
+          }}
+          addNewComponent={<AddNewPlaceholder message="Add new individual form coming soon." />}
+          extraTabs={[
+            { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge individuals form coming soon." />, icon: GitMerge },
+          ]}
+          actions={[
+            { key: 'view', label: 'View', href: (item) => `/trees/${treeId}/individuals/${item.id}` },
+            { key: 'edit', label: 'Edit', href: () => '#' },
+            { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
+          ]}
+        />
       </div>
     </DashboardLayout>
   );

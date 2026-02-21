@@ -1,5 +1,8 @@
 // Shared UI components - reusable across features
 
+// Layout / Page headers
+export { default as TreePageHeader } from './TreePageHeader';
+
 // Cards
 export * from './cards';
 

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Users, Heart, MapPin, Calendar, BookOpen, FileText, Search, KeyRound } from 'lucide-react';
 
 /**
  * TreeCard - Displays a family tree with mini pedigree preview
@@ -24,9 +25,10 @@ export default function TreeCard({
     isPublic,
     individualsCount = 0,
     familiesCount = 0,
-    generations = 0,
-    locations = [],
-    dateRange = {},
+    placesCount = 0,
+    eventsCount = 0,
+    sourcesCount = 0,
+    notesCount = 0,
     owner,
     updatedAt,
     focalPerson,
@@ -82,51 +84,14 @@ export default function TreeCard({
         </div>
 
         {/* Stats */}
-        <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-base-content/70 mb-3">
-          <div className="flex items-center gap-1.5">
-            <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-            <span><strong>{individualsCount.toLocaleString()}</strong> people</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <span><strong>{familiesCount}</strong> families</span>
-          </div>
-          {generations > 0 && (
-            <div className="flex items-center gap-1.5">
-              <svg className="w-4 h-4 opacity-60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-              </svg>
-              <span><strong>{generations}</strong> generations</span>
-            </div>
-          )}
-        </div>
-
-        {/* Locations */}
-        {locations.length > 0 && !isCompact && (
-          <div className="flex items-center gap-1.5 text-sm text-base-content/50 mb-3">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            </svg>
-            <span className="truncate">{locations.join(' → ')}</span>
-          </div>
-        )}
-
-        {/* Date Range */}
-        {dateRange.start && !isCompact && (
-          <div className="flex items-center gap-1.5 text-sm text-base-content/50 mb-3">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            <span>{dateRange.start} - {dateRange.end || 'Present'}</span>
+        {!isCompact && (
+          <div className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm text-base-content/70 mb-3">
+            <StatItem icon={Users} value={individualsCount} label="people" />
+            <StatItem icon={Heart} value={familiesCount} label="families" />
+            <StatItem icon={MapPin} value={placesCount} label="places" />
+            <StatItem icon={Calendar} value={eventsCount} label="events" />
+            <StatItem icon={BookOpen} value={sourcesCount} label="sources" />
+            <StatItem icon={FileText} value={notesCount} label="notes" />
           </div>
         )}
 
@@ -146,10 +111,7 @@ export default function TreeCard({
             href={`/trees/${id}`}
             className="btn btn-primary flex-1"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <Search className="w-4 h-4" />
             Explore
           </Link>
           {!isPublic && onRequestAccess && (
@@ -157,10 +119,7 @@ export default function TreeCard({
               onClick={() => onRequestAccess(tree)}
               className="btn btn-secondary"
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-              </svg>
+              <KeyRound className="w-4 h-4" />
               Request Access
             </button>
           )}
@@ -311,6 +270,15 @@ function formatRelativeTime(dateString) {
   if (diffMonths < 12) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
   
   return date.toLocaleDateString();
+}
+
+function StatItem({ icon: Icon, value, label }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
+      <span><strong>{(value ?? 0).toLocaleString()}</strong> {label}</span>
+    </div>
+  );
 }
 
 /**

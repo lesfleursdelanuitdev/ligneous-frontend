@@ -12,13 +12,15 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
+    const limit = parseInt(searchParams.get('limit') || '10');
     const search = searchParams.get('search') || '';
-    const status = searchParams.get('status'); // 'active', 'inactive', or null for all
+    const status = searchParams.get('status');
+    const sort = searchParams.get('sort') || 'createdAt';
+    const order = searchParams.get('order') || 'desc';
+    const advancedConditionsJson = searchParams.get('advanced_conditions');
 
     const skip = (page - 1) * limit;
 
-    // Build where clause
     const where = {};
     
     if (search) {
@@ -28,6 +30,25 @@ export async function GET(request) {
         { name: { contains: search, mode: 'insensitive' } },
       ];
     }
+    let advancedConditions = [];
+    try { if (advancedConditionsJson) advancedConditions = JSON.parse(advancedConditionsJson); } catch { advancedConditions = []; }
+    const andParts = [];
+    const mode = { mode: 'insensitive' };
+    for (const c of advancedConditions) {
+      if (!c.value?.trim?.()) continue;
+      const val = c.value.trim();
+      const op = c.operator || 'contains';
+      const fields = { username: 'username', email: 'email', name: 'name' };
+      const dbField = fields[c.field];
+      if (!dbField) continue;
+      if (op === 'contains') andParts.push({ [dbField]: { contains: val, ...mode } });
+      else if (op === 'not_contains') andParts.push({ NOT: { [dbField]: { contains: val, ...mode } } });
+      else if (op === 'equals') andParts.push({ [dbField]: { equals: val, ...mode } });
+      else if (op === 'not_equals') andParts.push({ NOT: { [dbField]: { equals: val, ...mode } } });
+      else if (op === 'starts_with') andParts.push({ [dbField]: { startsWith: val, ...mode } });
+      else if (op === 'ends_with') andParts.push({ [dbField]: { endsWith: val, ...mode } });
+    }
+    if (andParts.length > 0) where.AND = andParts;
 
     if (status === 'active') {
       where.isActive = true;
@@ -35,7 +56,14 @@ export async function GET(request) {
       where.isActive = false;
     }
 
-    // Get users with counts
+    const sortableFields = {
+      username: { username: order },
+      email: { email: order },
+      createdAt: { createdAt: order },
+      lastLoginAt: { lastLoginAt: order },
+    };
+    const orderBy = sortableFields[sort] || { createdAt: 'desc' };
+
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where,
@@ -63,7 +91,7 @@ export async function GET(request) {
             },
           },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         skip,
         take: limit,
       }),

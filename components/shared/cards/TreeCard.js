@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Users, Heart, MapPin, Calendar, BookOpen, FileText } from 'lucide-react';
 import BaseCard from './BaseCard';
 import { Badge } from '../ui/badges';
 import { EntityIcon } from '../ui/metadata';
@@ -33,14 +34,13 @@ export default function TreeCard({
     isPublic,
     individualsCount = 0,
     familiesCount = 0,
-    generations = 0,
-    locations = [],
-    dateRange = {},
+    placesCount = 0,
+    eventsCount = 0,
+    sourcesCount = 0,
+    notesCount = 0,
     owner,
     owners = [],
     updatedAt,
-    createdAt,
-    focalPerson,
   } = tree;
 
   const isCompact = variant === 'compact';
@@ -103,43 +103,13 @@ export default function TreeCard({
 
         {/* Stats */}
         {!isCompact && (
-          <div className="grid grid-cols-3 gap-3 py-2 border-t border-b border-base-content/10">
-            <div className="text-center">
-              <div className="text-lg font-semibold text-base-content">{individualsCount.toLocaleString()}</div>
-              <div className="text-xs text-base-content/50">{individualsCount === 1 ? 'Person' : 'People'}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-base-content">{familiesCount.toLocaleString()}</div>
-              <div className="text-xs text-base-content/50">{familiesCount === 1 ? 'Family' : 'Families'}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-base-content">{generations}</div>
-              <div className="text-xs text-base-content/50">{generations === 1 ? 'Generation' : 'Generations'}</div>
-            </div>
-          </div>
-        )}
-
-        {/* Date Range */}
-        {!isCompact && dateRange && (dateRange.start || dateRange.end) && (
-          <div className="text-sm text-base-content/70">
-            <span className="font-medium">Time Period:</span>{' '}
-            {dateRange.start || '?'} - {dateRange.end || 'Present'}
-          </div>
-        )}
-
-        {/* Locations */}
-        {!isCompact && locations && locations.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {locations.slice(0, 3).map((location, index) => (
-              <Badge key={index} variant="info" size="sm">
-                📍 {location}
-              </Badge>
-            ))}
-            {locations.length > 3 && (
-              <Badge variant="default" size="sm">
-                +{locations.length - 3} more
-              </Badge>
-            )}
+          <div className="grid grid-cols-3 gap-x-3 gap-y-2 py-2 border-t border-b border-base-content/10">
+            <StatItem icon={Users} value={individualsCount} label="People" />
+            <StatItem icon={Heart} value={familiesCount} label="Families" />
+            <StatItem icon={MapPin} value={placesCount} label="Places" />
+            <StatItem icon={Calendar} value={eventsCount} label="Events" />
+            <StatItem icon={BookOpen} value={sourcesCount} label="Sources" />
+            <StatItem icon={FileText} value={notesCount} label="Notes" />
           </div>
         )}
 
@@ -199,6 +169,16 @@ export default function TreeCard({
         )}
       </div>
     </BaseCard>
+  );
+}
+
+function StatItem({ icon: Icon, value, label }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <Icon className="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+      <span className="text-sm font-semibold text-base-content">{(value ?? 0).toLocaleString()}</span>
+      <span className="text-xs text-base-content/50 truncate">{label}</span>
+    </div>
   );
 }
 

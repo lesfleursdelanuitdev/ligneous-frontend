@@ -17,12 +17,18 @@ export async function GET(request) {
     // 2. Get filter from query params
     const { searchParams } = new URL(request.url);
     const filter = searchParams.get('filter'); // 'public', 'owned', or null for all
+    const search = searchParams.get('search') || '';
+    const advancedConditionsJson = searchParams.get('advanced_conditions');
+    const limit = Math.min(parseInt(searchParams.get('limit'), 10) || 50, 500);
+    const offset = parseInt(searchParams.get('offset'), 10) || 0;
+    const sort = searchParams.get('sort') || 'updatedAt';
+    const order = searchParams.get('order') === 'asc' ? 'asc' : 'desc';
+    const visibility = searchParams.get('visibility'); // 'public', 'private', or null for all
 
     // 3. Build query based on user permissions and filter
     let whereClause = {};
 
     if (filter === 'public') {
-      // Only public trees
       whereClause = { isPublic: true };
     } else if (filter === 'owned' && user) {
       // Trees owned or maintained by user
@@ -73,9 +79,55 @@ export async function GET(request) {
       };
     }
 
-    // 3. Query trees with related data
-    const trees = await prisma.tree.findMany({
-      where: whereClause,
+    const andParts = [];
+    if (search) {
+      andParts.push({
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+        ],
+      });
+    }
+    let advancedConditions = [];
+    try { if (advancedConditionsJson) advancedConditions = JSON.parse(advancedConditionsJson); } catch { advancedConditions = []; }
+    const mode = { mode: 'insensitive' };
+    for (const c of advancedConditions) {
+      if (!c.value?.trim?.()) continue;
+      const val = c.value.trim();
+      const op = c.operator || 'contains';
+      if (c.field === 'name') {
+        if (op === 'contains') andParts.push({ name: { contains: val, ...mode } });
+        else if (op === 'not_contains') andParts.push({ NOT: { name: { contains: val, ...mode } } });
+        else if (op === 'equals') andParts.push({ name: { equals: val, ...mode } });
+        else if (op === 'not_equals') andParts.push({ NOT: { name: { equals: val, ...mode } } });
+        else if (op === 'starts_with') andParts.push({ name: { startsWith: val, ...mode } });
+        else if (op === 'ends_with') andParts.push({ name: { endsWith: val, ...mode } });
+      } else if (c.field === 'description') {
+        if (op === 'contains') andParts.push({ description: { contains: val, ...mode } });
+        else if (op === 'not_contains') andParts.push({ NOT: { description: { contains: val, ...mode } } });
+      }
+    }
+    if (andParts.length > 0) {
+      whereClause = { AND: [whereClause, ...andParts] };
+    }
+    if (visibility === 'public') {
+      whereClause = { AND: [whereClause, { isPublic: true }] };
+    } else if (visibility === 'private') {
+      whereClause = { AND: [whereClause, { isPublic: false }] };
+    }
+
+    const orderByMap = {
+      name: { name: order },
+      createdAt: { createdAt: order },
+      updatedAt: { updatedAt: order },
+      individuals_count: {}, // requires join, use default
+    };
+    const orderBy = orderByMap[sort] || { updatedAt: 'desc' };
+
+    // 4. Query trees with related data
+    const [trees, total] = await Promise.all([
+      prisma.tree.findMany({
+        where: whereClause,
       include: {
         owners: {
           select: {
@@ -102,6 +154,17 @@ export async function GET(request) {
             },
           },
         },
+        gedcomFile: {
+          select: {
+            individualsCount: true,
+            familiesCount: true,
+            placesCount: true,
+            eventsCount: true,
+            notesCount: true,
+            sourcesCount: true,
+            status: true,
+          },
+        },
         _count: {
           select: {
             owners: true,
@@ -110,49 +173,57 @@ export async function GET(request) {
           },
         },
       },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
+        orderBy,
+        skip: offset,
+        take: limit,
+      }),
+      prisma.tree.count({ where: whereClause }),
+    ]);
 
-    // 4. For each tree, get stats from Go API
-    const goApiUrl = process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8090';
-    const treesWithStats = await Promise.all(
-      trees.map(async (tree) => {
-        try {
-          const goResponse = await fetch(
-            `${goApiUrl}/api/v1/files/${tree.fileId}`,
-            { next: { revalidate: 60 } } // Cache for 60 seconds
-          );
-          
-          if (goResponse.ok) {
-            const goData = await goResponse.json();
-            const fileInfo = goData.data;
-            
-            return {
-              ...tree,
-              individualsCount: fileInfo.individuals_count || 0,
-              familiesCount: fileInfo.families_count || 0,
-              parseStatus: fileInfo.status || 'ready',
-            };
-          }
-        } catch (error) {
-          console.error(`Failed to fetch Go API data for tree ${tree.id}:`, error.message);
-        }
-        
-        // Return tree without Go API data if fetch fails
-        return {
-          ...tree,
-          individualsCount: 0,
-          familiesCount: 0,
-          parseStatus: 'unknown',
-        };
-      })
-    );
+    // 4. Enrich with stats: use gedcomFile relation, or fallback lookup by fileId when null
+    const fileIdsToLookup = trees.filter((t) => !t.gedcomFile && t.fileId).map((t) => t.fileId);
+    const gedcomByFileId =
+      fileIdsToLookup.length > 0
+        ? Object.fromEntries(
+            (
+              await prisma.gedcomFile.findMany({
+                where: { fileId: { in: fileIdsToLookup } },
+                select: {
+                  fileId: true,
+                  individualsCount: true,
+                  familiesCount: true,
+                  placesCount: true,
+                  datesCount: true,
+                  eventsCount: true,
+                  notesCount: true,
+                  sourcesCount: true,
+                  status: true,
+                },
+              })
+            ).map((gf) => [gf.fileId, gf])
+          )
+        : {};
+
+    const treesWithStats = trees.map((tree) => {
+      const gf = tree.gedcomFile ?? gedcomByFileId[tree.fileId];
+      return {
+        ...tree,
+        gedcomFile: undefined,
+        individualsCount: gf?.individualsCount ?? 0,
+        familiesCount: gf?.familiesCount ?? 0,
+        placesCount: gf?.placesCount ?? 0,
+        datesCount: gf?.datesCount ?? 0,
+        eventsCount: gf?.eventsCount ?? 0,
+        notesCount: gf?.notesCount ?? 0,
+        sourcesCount: gf?.sourcesCount ?? 0,
+        parseStatus: gf?.status ?? 'unknown',
+      };
+    });
 
     return NextResponse.json({
       success: true,
       trees: treesWithStats,
+      pagination: { total, limit, offset, hasMore: offset + trees.length < total },
     });
   } catch (error) {
     console.error('Trees listing error:', error);
@@ -200,21 +271,15 @@ export async function POST(request) {
       );
     }
 
-    // Verify the file exists in Go API
-    const goApiUrl = process.env.NEXT_PUBLIC_GO_API_URL || 'http://localhost:8090';
-    try {
-      const goResponse = await fetch(`${goApiUrl}/api/v1/files/${fileId}`);
-      if (!goResponse.ok) {
-        return NextResponse.json(
-          { error: 'GEDCOM file not found. Please upload the file first.' },
-          { status: 400 }
-        );
-      }
-    } catch (error) {
-      console.error('Go API check failed:', error);
+    // Verify the GedcomFile exists locally
+    const gedcomFile = await prisma.gedcomFile.findUnique({
+      where: { fileId },
+      select: { id: true },
+    });
+    if (!gedcomFile) {
       return NextResponse.json(
-        { error: 'Unable to verify GEDCOM file. Please try again.' },
-        { status: 500 }
+        { error: 'GEDCOM file not found. Please upload the file first.' },
+        { status: 400 }
       );
     }
 

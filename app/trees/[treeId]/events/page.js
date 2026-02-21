@@ -1,92 +1,141 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DashboardLayout } from '@/components';
-import { DataView } from '@/components/shared/data-display';
-import { ViewToggle } from '@/components/shared/navigation';
+import { DashboardLayout, TreePageHeader } from '@/components';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { authFetch } from '@/lib/api';
+
+function LinkedTo({ items, treeId }) {
+  if (!items || items.length === 0) return <span className="text-base-content/40">{'\u2014'}</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-x-1.5 gap-y-0.5">
+      {items.map((link, i) => {
+        if (link.type === 'individual') {
+          return (
+            <Link key={i} href={`/trees/${treeId}/individuals/${encodeURIComponent(link.xref)}`} className="link link-primary text-sm">
+              {link.name || link.xref}
+            </Link>
+          );
+        }
+        const parts = [link.husbandName, link.wifeName].filter(Boolean);
+        if (parts.length === 0) return <span key={i} className="text-sm text-base-content/60">{link.xref}</span>;
+        return (
+          <span key={i} className="inline-flex flex-wrap items-center gap-x-1 text-sm">
+            {link.husbandXref ? <Link href={`/trees/${treeId}/individuals/${encodeURIComponent(link.husbandXref)}`} className="link link-primary">{link.husbandName}</Link> : link.husbandName ? <span>{link.husbandName}</span> : null}
+            {link.husbandName && link.wifeName && <span className="text-base-content/40">&amp;</span>}
+            {link.wifeXref ? <Link href={`/trees/${treeId}/individuals/${encodeURIComponent(link.wifeXref)}`} className="link link-primary">{link.wifeName}</Link> : link.wifeName ? <span>{link.wifeName}</span> : null}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
 
 export default function TreeEventsPage() {
   const params = useParams();
   const treeId = params?.treeId;
   const [items, setItems] = useState([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [view, setView] = useState('list');
+  const retryRef = useRef(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
     if (!treeId) return;
     try {
       setLoading(true);
       setError(null);
-      const res = await authFetch(`/api/trees/${treeId}/events?limit=500`);
+      const qs = new URLSearchParams();
+      qs.set('limit', String(perPage));
+      qs.set('offset', String((page - 1) * perPage));
+      if (search) qs.set('search', search);
+      if (sort) qs.set('sort', sort);
+      qs.set('order', sortDirection);
+      if (filters?.event_type) qs.set('event_type', filters.event_type);
+      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
+
+      const res = await authFetch(`/api/trees/${treeId}/events?${qs}`);
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        const msg = typeof data?.error === 'string' ? data.error : (data?.error?.message ?? data?.message ?? 'Failed to fetch');
-        throw new Error(msg);
-      }
-      setItems(data.events || data.items || []);
+      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch events');
+      setItems(data.data || []);
+      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
     } catch (err) {
-      setError(err?.message && typeof err.message === 'string' ? err.message : String(err) || 'Failed to load');
+      setError(err?.message || 'Failed to load events');
     } finally {
       setLoading(false);
     }
   }, [treeId]);
 
-  useEffect(() => { fetchData(); }, [fetchData]);
-
-  if (!treeId) return (<DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>);
-
-  const headers = [{ label: 'Type', key: 'type', sortable: false }, { label: 'Date', key: 'date', sortable: false }, { label: 'Place', key: 'place', sortable: false }];
+  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
 
   return (
     <DashboardLayout>
       <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <Link href={`/trees/${treeId}`} className="text-sm link link-primary mb-1 inline-block">← Tree overview</Link>
-            <h1 className="text-2xl font-bold text-base-content">Events</h1>
-            <p className="text-base-content/60 mt-1">{items.length} events</p>
-          </div>
-          <ViewToggle view={view} onViewChange={setView} />
-        </div>
-        {error && (
-          <div className="alert alert-error flex items-center justify-between gap-4">
-            <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={() => fetchData()}>Try again</button>
-          </div>
-        )}
-        {loading ? (
-          <div className="rounded-box border border-base-content/10 bg-base-200/50 p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]">
-            <span className="loading loading-spinner loading-lg text-primary" />
-            <p className="text-sm text-base-content/60">Loading…</p>
-          </div>
-        ) : error ? null : items.length === 0 ? (
-          <div className="card bg-base-100 border border-base-content/10 p-12 text-center rounded-box"><p className="text-base-content/60">No events in this tree.</p></div>
-        ) : (
-          <DataView
-            view={view}
-            items={items}
-            renderCard={(row) => (
-              <div className="card bg-base-200 rounded-box p-4">
-                <div className="font-medium">{row.type ?? row.event_type ?? 'Event'}</div>
-                <div className="text-sm text-base-content/70">{row.date ?? row.normalized ?? '—'}</div>
-                <div className="text-sm text-base-content/70">{row.place ?? '—'}</div>
-              </div>
-            )}
-            renderRow={(row) => (
-              <>
-                <td className="px-6 py-4">{row.type ?? row.event_type ?? '—'}</td>
-                <td className="px-6 py-4">{row.date ?? row.normalized ?? '—'}</td>
-                <td className="px-6 py-4">{row.place ?? '—'}</td>
-              </>
-            )}
-            listViewProps={{ headers }}
-            className={view === 'list' ? 'overflow-x-auto' : ''}
-          />
-        )}
+        <TreePageHeader treeId={treeId} title="Events" subtitle={`${totalItems} events`} />
+
+        <DataViewContainer
+          items={items}
+          loading={loading}
+          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          emptyState={{ title: 'No events', message: 'No events found in this tree.' }}
+          defaultView="list"
+          renderCard={(row) => (
+            <div className="card bg-base-200 rounded-box p-4 space-y-1">
+              <div className="font-medium">{row.customType || row.eventType || 'Event'}</div>
+              <div className="text-sm text-base-content/70">{row.date?.original ?? '—'}</div>
+              {row.place?.original && <div className="text-sm text-base-content/70">{row.place.original}</div>}
+              <div className="pt-1"><LinkedTo items={row.linkedTo} treeId={treeId} /></div>
+            </div>
+          )}
+          renderRow={(row) => (
+            <>
+              <td className="px-6 py-4">{row.customType || row.eventType || '—'}</td>
+              <td className="px-6 py-4">{row.date?.original ?? '—'}</td>
+              <td className="px-6 py-4">{row.place?.original ?? '—'}</td>
+              <td className="px-6 py-4"><LinkedTo items={row.linkedTo} treeId={treeId} /></td>
+            </>
+          )}
+          listHeaders={[
+            { label: 'Type', key: 'event_type', sortable: true },
+            { label: 'Date', key: 'date', sortable: true },
+            { label: 'Place', key: 'place', sortable: true },
+            { label: 'Linked To', key: 'linkedTo', sortable: false },
+          ]}
+          searchPlaceholder="Search events..."
+          searchLabel="Event type, date, or place"
+          advancedSearchFields={[
+            { key: 'event_type', label: 'Event type' },
+            { key: 'custom_type', label: 'Custom type' },
+            { key: 'place', label: 'Place' },
+            { key: 'year', label: 'Year' },
+          ]}
+          filters={[
+            { key: 'event_type', label: 'Event Type', type: 'select', options: [
+              { value: 'BIRT', label: 'Birth' }, { value: 'DEAT', label: 'Death' },
+              { value: 'MARR', label: 'Marriage' }, { value: 'DIV', label: 'Divorce' },
+              { value: 'BURI', label: 'Burial' }, { value: 'BAPM', label: 'Baptism' },
+              { value: 'CHR', label: 'Christening' }, { value: 'CENS', label: 'Census' },
+              { value: 'RESI', label: 'Residence' }, { value: 'OCCU', label: 'Occupation' },
+            ]},
+          ]}
+          sortOptions={[
+            { value: 'event_type', label: 'Type' },
+            { value: 'date', label: 'Date' },
+            { value: 'place', label: 'Place' },
+          ]}
+          defaultSort="event_type"
+          totalItems={totalItems}
+          defaultPerPage={10}
+          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          addNewComponent={<AddNewPlaceholder message="Add new event form coming soon." />}
+          actions={[
+            { key: 'view', label: 'View', href: () => '#' },
+            { key: 'edit', label: 'Edit', href: () => '#' },
+            { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
+          ]}
+        />
       </div>
     </DashboardLayout>
   );

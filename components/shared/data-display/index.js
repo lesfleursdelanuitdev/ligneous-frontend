@@ -1,6 +1,13 @@
 export { default as DataViewContainer } from './DataViewContainer';
+export { default as AddNewPlaceholder } from './AddNewPlaceholder';
+export { default as DataViewToolbar } from './DataViewToolbar';
 export { default as DataView } from './DataView';
+export { default as DataViewSearch } from './DataViewSearch';
+export { default as DataViewSearchAdvanced } from './DataViewSearchAdvanced';
+export { default as DataViewFilter } from './DataViewFilter';
+export { default as DataViewSort } from './DataViewSort';
+export { default as DataViewActions } from './DataViewActions';
+export { default as DataViewTabs } from './DataViewTabs';
 export { default as ListView } from './ListView';
 export { default as CardGrid } from './CardGrid';
 export { default as ListSkeleton } from './ListSkeleton';
-

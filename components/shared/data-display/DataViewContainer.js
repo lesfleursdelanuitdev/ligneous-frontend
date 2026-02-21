@@ -1,157 +1,277 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { LayoutGrid, Plus } from 'lucide-react';
 import DataView from './DataView';
-import ViewToggle from '../navigation/ViewToggle';
-import SortDropdown from '../navigation/SortDropdown';
-import SearchBar from '../forms/SearchBar';
+import DataViewSearch from './DataViewSearch';
+import DataViewSearchAdvanced from './DataViewSearchAdvanced';
+import DataViewFilter from './DataViewFilter';
+import DataViewSort from './DataViewSort';
+import DataViewActions from './DataViewActions';
+import DataViewTabs from './DataViewTabs';
+import DataViewToolbar from './DataViewToolbar';
 import Pagination from '../navigation/Pagination';
-import { EmptyState, LoadingState, ErrorState } from '../feedback';
 
 /**
- * DataViewContainer Component
- * Main container for list/card views with search, sort, pagination
- * 
- * @param {Object} props
- * @param {Array} props.items - Array of items to display
- * @param {Function} props.renderCard - Function to render card: (item, index) => ReactNode
- * @param {Function} props.renderRow - Function to render list row: (item, index) => ReactNode
- * @param {string} props.defaultView - Default view: 'list' or 'card'
- * @param {Array} props.sortOptions - Array of { value, label } for sorting
- * @param {string} props.defaultSort - Default sort value
- * @param {Function} props.onSortChange - Callback when sort changes
- * @param {string} props.searchValue - Search value
- * @param {Function} props.onSearchChange - Callback when search changes
- * @param {number} props.currentPage - Current page (1-based)
- * @param {number} props.totalPages - Total pages
- * @param {number} props.totalItems - Total items
- * @param {number} props.itemsPerPage - Items per page
- * @param {Function} props.onPageChange - Callback when page changes
- * @param {boolean} props.loading - Loading state
- * @param {Object} props.error - Error object { title, message, onRetry }
- * @param {Object} props.emptyState - Empty state props { title, message, action }
- * @param {Object} props.cardGridProps - Props for CardGrid
- * @param {Object} props.listViewProps - Props for ListView (headers, etc.)
- * @param {string} props.className - Additional CSS classes
+ * DataViewContainer — single orchestrator for paginated, searchable,
+ * filterable, sortable list/card views with tabs and entity actions.
+ *
+ * All data fetching is done by the parent page via the onParamsChange callback.
+ * This component manages UI state and delegates rendering to sub-components.
  */
 export default function DataViewContainer({
+  // Data
   items = [],
+  loading = false,
+  error = null,
+  emptyState = {},
+
+  // Rendering
   renderCard,
   renderRow,
   defaultView = 'card',
-  sortOptions = [],
-  defaultSort,
-  onSortChange,
-  searchValue = '',
-  onSearchChange,
-  currentPage = 1,
-  totalPages = 1,
-  totalItems = 0,
-  itemsPerPage = 10,
-  onPageChange,
-  loading = false,
-  error,
-  emptyState,
+  listHeaders = [],
   cardGridProps = {},
-  listViewProps = {},
+
+  // Search
+  searchPlaceholder = 'Search...',
+  searchLabel = '',
+  advancedSearchFields = [],
+
+  // Filters
+  filters = [],
+
+  // Sort
+  sortOptions = [],
+  defaultSort = '',
+  defaultSortDirection = 'asc',
+
+  // Pagination (from API response)
+  totalItems = 0,
+  defaultPerPage = 10,
+
+  // Actions
+  actions = [],
+  userPermissions = {},
+
+  // Callback — parent re-fetches data when params change
+  onParamsChange,
+
+  // Tabs
+  addNewComponent = null,
+  extraTabs = [],
+
   className = '',
 }) {
   const [view, setView] = useState(defaultView);
-  const [sort, setSort] = useState(defaultSort || (sortOptions[0]?.value));
+  const [activeSection, setActiveSection] = useState(null); // 'search' | 'filter' | 'sort' | null
+  const [search, setSearch] = useState('');
+  const [advancedConditions, setAdvancedConditions] = useState([]);
+  const [filterValues, setFilterValues] = useState({});
+  const [sortKey, setSortKey] = useState(defaultSort || sortOptions[0]?.value || '');
+  const [sortDirection, setSortDirection] = useState(defaultSortDirection);
+  const [page, setPage] = useState(1);
+  const [perPage, setPerPage] = useState(defaultPerPage);
 
-  const handleSortChange = (value) => {
-    setSort(value);
-    if (onSortChange) {
-      onSortChange(value);
+  const isInitialMount = useRef(true);
+
+  const emitParams = useCallback(() => {
+    if (onParamsChange) {
+      onParamsChange({
+        search,
+        advancedConditions,
+        filters: filterValues,
+        sort: sortKey,
+        sortDirection,
+        page,
+        perPage,
+      });
     }
+  }, [search, advancedConditions, filterValues, sortKey, sortDirection, page, perPage, onParamsChange]);
+
+  // Emit on initial mount
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      emitParams();
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Emit whenever params change (skip initial since handled above)
+  const prevParams = useRef(null);
+  useEffect(() => {
+    const key = JSON.stringify({ search, advancedConditions, filterValues, sortKey, sortDirection, page, perPage });
+    if (prevParams.current !== null && prevParams.current !== key) {
+      emitParams();
+    }
+    prevParams.current = key;
+  }, [search, advancedConditions, filterValues, sortKey, sortDirection, page, perPage, emitParams]);
+
+  // Reset to page 1 when search, advanced conditions, filters, sort, or perPage change
+  const handleSearch = (val) => { setSearch(val); setPage(1); };
+  const handleAdvancedConditions = (conds) => { setAdvancedConditions(conds); setPage(1); };
+  const handleFilterChange = (vals) => { setFilterValues(vals); setPage(1); };
+  const handleFilterClear = () => { setFilterValues({}); setPage(1); };
+  const handleSortChange = (key, dir) => { setSortKey(key); setSortDirection(dir); setPage(1); };
+  const handlePerPageChange = (n) => { setPerPage(n); setPage(1); };
+
+  // Wire list header clicks to sort
+  const handleHeaderSort = (key, direction) => {
+    setSortKey(key);
+    setSortDirection(direction);
+    setPage(1);
   };
 
-  const handleViewChange = (newView) => {
-    setView(newView);
+  const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
+
+  // Augment list headers with an actions column when actions are defined
+  const augmentedHeaders = actions.length > 0
+    ? [...listHeaders, { label: 'Actions', key: '_actions', sortable: false }]
+    : listHeaders;
+
+  // Wrap renderRow to append actions column
+  const wrappedRenderRow = (item, index) => {
+    const rowContent = renderRow(item, index);
+    if (actions.length === 0) return rowContent;
+    return (
+      <>
+        {rowContent}
+        <td className="px-4 py-3">
+          <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="row" />
+        </td>
+      </>
+    );
   };
 
-  // Loading state
-  if (loading) {
+  // Wrap renderCard — outer wrapper becomes the card, inner card styling is stripped
+  const wrappedRenderCard = (item, index) => {
+    const cardContent = renderCard(item, index);
+    if (actions.length === 0) return cardContent;
     return (
-      <div className={className}>
-        <LoadingState message="Loading items..." />
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className={className}>
-        <ErrorState
-          title={error.title}
-          message={error.message}
-          onRetry={error.onRetry}
-        />
-      </div>
-    );
-  }
-
-  // Empty state
-  if (!items || items.length === 0) {
-    return (
-      <div className={className}>
-        <EmptyState
-          title={emptyState?.title || 'No items found'}
-          message={emptyState?.message || 'Try adjusting your search or filters.'}
-          action={emptyState?.action}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className={`space-y-4 ${className}`}>
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex-1 w-full sm:max-w-md">
-          {onSearchChange && (
-            <SearchBar
-              value={searchValue}
-              onChange={onSearchChange}
-              placeholder="Search items..."
-            />
-          )}
+      <div className="rounded-box border border-base-content/10 bg-base-100 overflow-hidden flex flex-col h-full">
+        <div className="flex-1 min-h-0 [&>*]:border-0 [&>*]:rounded-none [&>*]:shadow-none">
+          {cardContent}
         </div>
-        
-        <div className="flex items-center gap-3">
-          {sortOptions.length > 0 && (
-            <SortDropdown
-              options={sortOptions}
-              value={sort}
-              onChange={handleSortChange}
-            />
-          )}
-          <ViewToggle view={view} onViewChange={handleViewChange} />
+        <div className="flex-shrink-0 px-4 pb-3">
+          <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="card" />
         </div>
       </div>
+    );
+  };
 
-      {/* Data View */}
-      <DataView
-        view={view}
-        items={items}
-        renderCard={renderCard}
-        renderRow={renderRow}
-        cardGridProps={cardGridProps}
-        listViewProps={listViewProps}
-      />
+  // Tab content: list/grid + pagination only (toolbar is above tabs)
+  const dataViewContent = (
+    <div className="space-y-4">
+      {loading ? (
+        <div className="rounded-box border border-base-content/10 bg-base-200/50 p-8 flex flex-col items-center justify-center gap-3 min-h-[200px]">
+          <span className="loading loading-spinner loading-lg text-primary" />
+          <p className="text-sm text-base-content/60">Loading...</p>
+        </div>
+      ) : error ? (
+        <div className="alert alert-error flex items-center justify-between gap-4">
+          <span>{typeof error === 'string' ? error : error.message || 'An error occurred'}</span>
+          {error.onRetry && (
+            <button type="button" className="btn btn-sm btn-ghost" onClick={error.onRetry}>Try again</button>
+          )}
+        </div>
+      ) : items.length === 0 ? (
+        <div className="card bg-base-100 border border-base-content/10 p-12 text-center rounded-box">
+          <p className="text-lg font-medium text-base-content mb-1">{emptyState.title || 'No items found'}</p>
+          <p className="text-base-content/60">{emptyState.message || 'Try adjusting your search or filters.'}</p>
+          {emptyState.action && (
+            <div className="mt-4">{emptyState.action}</div>
+          )}
+        </div>
+      ) : (
+        <DataView
+          view={view}
+          items={items}
+          renderCard={wrappedRenderCard}
+          renderRow={wrappedRenderRow}
+          cardGridProps={cardGridProps}
+          listViewProps={{
+            headers: augmentedHeaders,
+            onSort: handleHeaderSort,
+            sortKey,
+            sortDirection,
+          }}
+          className={view === 'list' ? 'overflow-x-auto' : ''}
+        />
+      )}
 
-      {/* Pagination */}
-      {totalPages > 1 && onPageChange && (
+      {/* Pagination — always show when there are items (even 1 page, for the per-page selector) */}
+      {!loading && !error && items.length > 0 && (
         <Pagination
-          currentPage={currentPage}
+          currentPage={page}
           totalPages={totalPages}
           totalItems={totalItems}
-          itemsPerPage={itemsPerPage}
-          onPageChange={onPageChange}
+          itemsPerPage={perPage}
+          onPageChange={setPage}
+          onPerPageChange={handlePerPageChange}
         />
       )}
     </div>
   );
-}
 
+  // Build tabs — "View All" is always the first tab
+  const tabs = [{ key: 'view-all', label: 'View All', content: dataViewContent, icon: LayoutGrid }];
+  if (addNewComponent) {
+    tabs.push({ key: 'add', label: 'Add New', content: addNewComponent, icon: Plus });
+  }
+  for (const extra of extraTabs) {
+    tabs.push(extra);
+  }
+
+  return (
+    <div className={`space-y-4 ${className}`}>
+      {/* Toolbar — above tabs */}
+      <DataViewToolbar
+        activeSection={activeSection}
+        onSectionChange={setActiveSection}
+        view={view}
+        onViewChange={setView}
+        hasSearch={true}
+        hasFilters={filters.length > 0}
+        hasSort={sortOptions.length > 0}
+        renderSearchSection={() => (
+          <div className="flex flex-col gap-3">
+            <div className="w-full sm:max-w-sm">
+              <DataViewSearch
+                value={search}
+                onChange={handleSearch}
+                placeholder={searchPlaceholder}
+                searchLabel={searchLabel}
+              />
+            </div>
+            {advancedSearchFields.length > 0 && (
+              <DataViewSearchAdvanced
+                fields={advancedSearchFields}
+                value={advancedConditions}
+                onChange={handleAdvancedConditions}
+              />
+            )}
+          </div>
+        )}
+        renderFilterSection={() => filters.length > 0 ? (
+          <DataViewFilter
+            filters={filters}
+            values={filterValues}
+            onChange={handleFilterChange}
+            onClear={handleFilterClear}
+          />
+        ) : null}
+        renderSortSection={() => sortOptions.length > 0 ? (
+          <DataViewSort
+            options={sortOptions}
+            sortKey={sortKey}
+            sortDirection={sortDirection}
+            onChange={handleSortChange}
+          />
+        ) : null}
+      />
+
+      {/* Tabs — below toolbar */}
+      <DataViewTabs tabs={tabs} defaultTab="view-all" />
+    </div>
+  );
+}

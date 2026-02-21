@@ -43,10 +43,6 @@ export const buildLigneousSystem = async () => {
       baseURL: apiConfig.nextApi.baseURL,
       timeout: apiConfig.nextApi.timeout
     })
-    .config('goAPI', {
-      baseURL: apiConfig.goApi.baseURL,
-      timeout: apiConfig.goApi.timeout
-    })
     .use(useListeners)
     .use(useErrors)  // Errors facet should be early to collect errors from other facets
     .use(useAuth)
