@@ -40,6 +40,7 @@ export default function DataViewContainer({
 
   // Filters
   filters = [],
+  defaultFilterValues = {},
 
   // Sort
   sortOptions = [],
@@ -54,6 +55,11 @@ export default function DataViewContainer({
   actions = [],
   userPermissions = {},
 
+  // Selection / bulk actions
+  getItemId = (item) => item?.id ?? item?.xref ?? '',
+  onBulkDelete,
+  onBulkCompare,
+
   // Callback — parent re-fetches data when params change
   onParamsChange,
 
@@ -67,13 +73,22 @@ export default function DataViewContainer({
   const [activeSection, setActiveSection] = useState(null); // 'search' | 'filter' | 'sort' | null
   const [search, setSearch] = useState('');
   const [advancedConditions, setAdvancedConditions] = useState([]);
-  const [filterValues, setFilterValues] = useState({});
+  const [filterValues, setFilterValues] = useState(defaultFilterValues);
   const [sortKey, setSortKey] = useState(defaultSort || sortOptions[0]?.value || '');
   const [sortDirection, setSortDirection] = useState(defaultSortDirection);
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(defaultPerPage);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
 
+  const isSelectionMode = activeSection === 'selection';
   const isInitialMount = useRef(true);
+
+  // Clear selection when exiting selection mode
+  useEffect(() => {
+    if (!isSelectionMode) {
+      setSelectedIds(new Set());
+    }
+  }, [isSelectionMode]);
 
   const emitParams = useCallback(() => {
     if (onParamsChange) {
@@ -124,39 +139,93 @@ export default function DataViewContainer({
 
   const totalPages = Math.max(1, Math.ceil(totalItems / perPage));
 
-  // Augment list headers with an actions column when actions are defined
-  const augmentedHeaders = actions.length > 0
-    ? [...listHeaders, { label: 'Actions', key: '_actions', sortable: false }]
-    : listHeaders;
+  // Selection handlers
+  const handleSelectionChange = useCallback((ids) => {
+    setSelectedIds(new Set(ids));
+  }, []);
+  const handleToggleSelect = useCallback((id) => {
+    if (!id) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const handleSelectAllOnPage = useCallback(() => {
+    const ids = items.map((item) => getItemId(item)).filter(Boolean);
+    setSelectedIds((prev) => {
+      const allSelected = ids.length > 0 && ids.every((id) => prev.has(id));
+      return allSelected ? new Set() : new Set(ids);
+    });
+  }, [items, getItemId]);
+  const selectedIdsArray = Array.from(selectedIds);
 
-  // Wrap renderRow to append actions column
+  // Augment list headers: select column (when selection mode) + original + actions
+  const augmentedHeaders = [
+    ...(isSelectionMode ? [{ label: '', key: '_select', sortable: false }] : []),
+    ...listHeaders,
+    ...(actions.length > 0 ? [{ label: 'Actions', key: '_actions', sortable: false }] : []),
+  ];
+
+  // Wrap renderRow: optional select checkbox + row content + actions column
   const wrappedRenderRow = (item, index) => {
+    const id = getItemId(item);
     const rowContent = renderRow(item, index);
-    if (actions.length === 0) return rowContent;
+    const selectCell = isSelectionMode ? (
+      <td key="_select" className="px-4 py-3 w-10">
+        <input
+          type="checkbox"
+          className="checkbox checkbox-sm"
+          checked={selectedIds.has(id)}
+          onChange={() => handleToggleSelect(id)}
+          aria-label={`Select ${id}`}
+        />
+      </td>
+    ) : null;
+    const actionsCell = actions.length > 0 ? (
+      <td key="_actions" className="px-4 py-3">
+        <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="row" />
+      </td>
+    ) : null;
     return (
       <>
+        {selectCell}
         {rowContent}
-        <td className="px-4 py-3">
-          <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="row" />
-        </td>
+        {actionsCell}
       </>
     );
   };
 
-  // Wrap renderCard — outer wrapper becomes the card, inner card styling is stripped
+  // Wrap renderCard — optional select checkbox overlay, card content, actions footer
   const wrappedRenderCard = (item, index) => {
+    const id = getItemId(item);
     const cardContent = renderCard(item, index);
-    if (actions.length === 0) return cardContent;
-    return (
-      <div className="rounded-box border border-base-content/10 bg-base-100 overflow-hidden flex flex-col h-full">
+    const cardInner = (
+      <div className="rounded-box border border-base-content/10 bg-base-100 overflow-hidden flex flex-col h-full relative">
+        {isSelectionMode && (
+          <div className="absolute top-3 left-3 z-10">
+            <input
+              type="checkbox"
+              className="checkbox checkbox-sm checkbox-primary"
+              checked={selectedIds.has(id)}
+              onChange={() => handleToggleSelect(id)}
+              aria-label={`Select ${id}`}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        )}
         <div className="flex-1 min-h-0 [&>*]:border-0 [&>*]:rounded-none [&>*]:shadow-none">
           {cardContent}
         </div>
-        <div className="flex-shrink-0 px-4 pb-3">
-          <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="card" />
-        </div>
+        {actions.length > 0 && (
+          <div className="flex-shrink-0 px-4 pb-3">
+            <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="card" />
+          </div>
+        )}
       </div>
     );
+    return (actions.length > 0 || isSelectionMode) ? cardInner : cardContent;
   };
 
   // Tab content: list/grid + pagination only (toolbar is above tabs)
@@ -194,6 +263,9 @@ export default function DataViewContainer({
             onSort: handleHeaderSort,
             sortKey,
             sortDirection,
+            isSelectionMode,
+            onSelectAll: handleSelectAllOnPage,
+            isSelectAllChecked: items.length > 0 && items.every((i) => selectedIds.has(getItemId(i))),
           }}
           className={view === 'list' ? 'overflow-x-auto' : ''}
         />
@@ -268,6 +340,30 @@ export default function DataViewContainer({
             onChange={handleSortChange}
           />
         ) : null}
+        hasSelectionMode={true}
+        renderSelectionSection={() => (
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-sm font-medium text-base-content/80">In selection mode</span>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="btn btn-sm btn-error"
+                disabled={selectedIdsArray.length === 0}
+                onClick={() => onBulkDelete?.(selectedIdsArray)}
+              >
+                Delete
+              </button>
+              <button
+                type="button"
+                className="btn btn-sm btn-ghost"
+                disabled={selectedIdsArray.length === 0}
+                onClick={() => onBulkCompare?.(selectedIdsArray)}
+              >
+                Compare
+              </button>
+            </div>
+          </div>
+        )}
       />
 
       {/* Tabs — below toolbar */}

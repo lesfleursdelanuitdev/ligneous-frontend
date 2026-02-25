@@ -1,12 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useFacet, useListener } from 'mycelia-kernel-plugin/react';
 import CommentItem from './CommentItem';
 import CommentForm from './CommentForm';
 import LoadingState from '@/components/shared/feedback/LoadingState';
 import EmptyState from '@/components/shared/feedback/EmptyState';
 import { useAuthState } from '@/hooks/useAuthState';
+import { useComments } from '@/hooks/queries/useComments';
+import {
+  useCreateEntityComment,
+  useUpdateEntityComment,
+  useDeleteEntityComment,
+  useResolveEntityComment,
+} from '@/hooks/mutations/useEntityCommentMutations';
 
 /**
  * Lists comments for an entity and provides a form to add a new comment.
@@ -24,55 +29,22 @@ export default function CommentList({
   canModerate = false,
   className = '',
 }) {
-  const commentsFacet = useFacet('comments');
   const { user } = useAuthState();
-  const [comments, setComments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
-  const loadComments = () => {
-    if (!entityType || !entityId || !treeId) return;
-    setLoading(true);
-    setError(null);
-    commentsFacet
-      .getComments(entityType, entityId, treeId)
-      .then((list) => {
-        setComments(list);
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.response?.data?.error || err.message);
-        setLoading(false);
-      });
-  };
+  const { data: comments = [], isLoading, error } = useComments(entityType, entityId, treeId);
 
-  useEffect(() => {
-    loadComments();
-  }, [entityType, entityId, treeId]);
+  const createComment = useCreateEntityComment(entityType, entityId, treeId);
+  const updateComment = useUpdateEntityComment(entityType, entityId);
+  const deleteComment = useDeleteEntityComment(entityType, entityId);
+  const resolveComment = useResolveEntityComment(entityType, entityId);
 
-  useListener('comments:stateChanged', (event) => {
-    if (
-      event.body?.entityContext?.entityType === entityType &&
-      event.body?.entityContext?.entityId === entityId &&
-      event.body?.entityContext?.treeId === treeId
-    ) {
-      setComments(event.body.comments || []);
-      setLoading(!!event.body.loading);
-      setError(event.body.error || null);
-    }
-  });
+  const handleCreate = (content) => createComment.mutate({ content });
+  const handleReply = (parentId, content) => createComment.mutate({ content, parentId });
+  const handleEdit = (id, content) => updateComment.mutate({ commentId: id, content });
+  const handleDelete = (id) => deleteComment.mutate({ commentId: id });
+  const handleResolve = (id, resolved) => resolveComment.mutate({ commentId: id, resolved });
 
-  const handleCreate = (content) =>
-    commentsFacet.createComment({ entityType, entityId, treeId, content });
-
-  const handleReply = (parentId, content) =>
-    commentsFacet.createComment({ entityType, entityId, treeId, content, parentId });
-
-  const handleEdit = (id, content) => commentsFacet.updateComment(id, { content });
-  const handleDelete = (id) => commentsFacet.deleteComment(id);
-  const handleResolve = (id, resolved) => commentsFacet.resolveComment(id, resolved);
-
-  if (loading && comments.length === 0) {
+  if (isLoading && comments.length === 0) {
     return (
       <div className={className}>
         <h3 className="text-lg font-medium text-base-content mb-3">Comments</h3>
@@ -91,7 +63,7 @@ export default function CommentList({
       </h3>
 
       {error && (
-        <p className="text-sm text-error mb-3" role="alert">{error}</p>
+        <p className="text-sm text-error mb-3" role="alert">{error.message}</p>
       )}
 
       {user && (

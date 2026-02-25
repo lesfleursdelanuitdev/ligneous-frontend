@@ -2,22 +2,26 @@
 
 import { useState, useEffect } from 'react';
 import { useAuthState } from '@/hooks/useAuthState';
+import { ActiveTreeProvider, useActiveTree } from '@/context/ActiveTreeContext';
+import { TreeSelectorModal } from '@/components/shared/trees';
 import TopBar from './TopBar';
 import MobileNav from './MobileNav';
 import DesktopSidebar from './DesktopSidebar';
 import NotificationPanel from '../shared/notifications/NotificationPanel';
 import GlobalSearch from '@/components/features/search/GlobalSearch';
 
-export default function DashboardLayout({ children }) {
+/**
+ * Inner layout — rendered inside ActiveTreeProvider so it can read tree context.
+ */
+function DashboardLayoutInner({ children }) {
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Use useAuthState hook instead of managing own listeners
+
   const { user, isAuthenticated, isSuperuser } = useAuthState();
 
-  // ⌘K / Ctrl+K to open search
+  // ⌘K / Ctrl+K → open search
   useEffect(() => {
     const handleKeyDown = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -31,10 +35,7 @@ export default function DashboardLayout({ children }) {
 
   // Detect mobile viewport
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 1024);
-    };
-    
+    const checkMobile = () => setIsMobile(window.innerWidth < 1024);
     checkMobile();
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
@@ -42,41 +43,29 @@ export default function DashboardLayout({ children }) {
 
   // Prevent body scroll when notification panel is open on mobile
   useEffect(() => {
-    if (isNotificationOpen && isMobile) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
+    document.body.style.overflow = isNotificationOpen && isMobile ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
   }, [isNotificationOpen, isMobile]);
 
   return (
     <div className="min-h-screen bg-base-200">
-      {/* Top Bar - Fixed on all screen sizes */}
-      <TopBar 
-        user={user}
-        isSuperuser={isSuperuser}
+      <TopBar
         onNotificationClick={() => setIsNotificationOpen(true)}
-        onSearchClick={() => setIsSearchOpen(true)}
         onSidebarToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isSidebarCollapsed={isSidebarCollapsed}
       />
 
       <div className="flex pt-16">
-        {/* Desktop Sidebar - Hidden on mobile */}
-        <DesktopSidebar 
+        <DesktopSidebar
           user={user}
           isSuperuser={isSuperuser}
           isCollapsed={isSidebarCollapsed}
           className="hidden lg:flex"
         />
 
-        {/* Main Content Area */}
-        <main 
+        <main
           className={`
-            flex-1 min-h-[calc(100vh-4rem)] 
+            flex-1 min-h-[calc(100vh-4rem)]
             transition-all duration-200
             ${isSidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}
             pb-20 lg:pb-8
@@ -88,30 +77,30 @@ export default function DashboardLayout({ children }) {
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <MobileNav 
+      <MobileNav
         user={user}
         isSuperuser={isSuperuser}
         onNotificationClick={() => setIsNotificationOpen(true)}
         className="lg:hidden"
       />
 
-      {/* Notification Panel - Slide-in */}
-      <NotificationPanel 
+      {/* Notification Panel */}
+      <NotificationPanel
         isOpen={isNotificationOpen}
         onClose={() => setIsNotificationOpen(false)}
         user={user}
       />
-
-      {/* Notification Panel Overlay */}
       {isNotificationOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/50 z-40 lg:hidden"
           onClick={() => setIsNotificationOpen(false)}
         />
       )}
 
-      {/* Global Search Modal (command palette) */}
+      {/* Tree Selector Modal — driven by ActiveTreeContext */}
+      <TreeSelectorModal />
+
+      {/* Global Search Modal (⌘K) */}
       {isSearchOpen && (
         <>
           <div
@@ -137,3 +126,10 @@ export default function DashboardLayout({ children }) {
   );
 }
 
+export default function DashboardLayout({ children }) {
+  return (
+    <ActiveTreeProvider>
+      <DashboardLayoutInner>{children}</DashboardLayoutInner>
+    </ActiveTreeProvider>
+  );
+}

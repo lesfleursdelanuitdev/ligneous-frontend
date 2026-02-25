@@ -67,9 +67,16 @@ function EnableListeners({ children }) {
   return children;
 }
 
+import { QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { getQueryClient } from '@/lib/query-client';
+import { Toaster } from 'sonner';
 import ErrorNotificationContainer from '@/components/shared/notifications/ErrorNotificationContainer';
+import MyceliaQueryBridge from '@/components/shared/MyceliaQueryBridge';
 
 export function Providers({ children }) {
+  const queryClient = getQueryClient();
+
   return (
     <ThemeProvider>
       <MyceliaProvider
@@ -92,10 +99,15 @@ export function Providers({ children }) {
           </div>
         }
       >
-        <EnableListeners>
-          {children}
-          <ErrorNotificationContainer position="top-right" maxNotifications={5} />
-        </EnableListeners>
+        <QueryClientProvider client={queryClient}>
+          <EnableListeners>
+            <MyceliaQueryBridge />
+            {children}
+            <ErrorNotificationContainer position="top-right" maxNotifications={5} />
+            <Toaster position="bottom-right" richColors closeButton />
+          </EnableListeners>
+          <ReactQueryDevtools initialIsOpen={false} />
+        </QueryClientProvider>
       </MyceliaProvider>
     </ThemeProvider>
   );

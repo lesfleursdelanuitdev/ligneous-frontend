@@ -10,10 +10,10 @@
 
 **Note:** The gateway is now built into the frontend as Next.js API routes, so they run on the same port.
 
-### Go API (ligneous-gedcom-api)
-- **Port:** `8090` (default: 8080, but deployment uses 8090)
-- **URL:** http://localhost:8090
-- **Config:** `PORT` environment variable
+### GEDCOM Lib API (ligneous-gedcom-lib-api)
+- **Port:** `8091`
+- **URL:** http://localhost:8091
+- **Config:** `LIB_API_URL` in frontend; `PORT` in lib-api
 
 ## Ports in Use (Checked)
 
@@ -25,7 +25,7 @@ The following ports are currently in use:
 - 5173, 5175 (Vite dev servers)
 - 5432 (PostgreSQL)
 - 6379 (Redis)
-- 8000, 8080, 8090 (various services)
+- 8000, 8080, 8090, 8091 (various services)
 
 **Available ports:** 3001, 3002, 4001, 6000, 6001, 7000, 7001, etc.
 
@@ -33,8 +33,8 @@ The following ports are currently in use:
 
 ### Frontend `.env.local`
 ```bash
-# Go API URL (Next.js API routes will proxy to this)
-GO_API_URL=http://localhost:8090
+# GEDCOM lib API (ligneous-gedcom-lib-api; upload/export routes call this)
+LIB_API_URL=http://localhost:8091
 
 # Frontend API base URL (for client-side requests)
 NEXT_PUBLIC_API_URL=http://localhost:4000/api
@@ -47,7 +47,7 @@ Frontend (port 4000)
   ↓ (client-side requests)
 Next.js API Routes (/api/*) (same port 4000)
   ↓ (server-side proxy)
-Go API (port 8090)
+GEDCOM lib API (port 8091)
 ```
 
 ## Architecture Change

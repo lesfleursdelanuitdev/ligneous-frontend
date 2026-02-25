@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useFacet } from 'mycelia-kernel-plugin/react';
 import { DashboardLayout } from '@/components';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { authFetch } from '@/lib/api';
+import { useUploadAndValidateGedcom, useCreateTree } from '@/hooks/mutations/useGedcomMutations';
 
 export default function UploadPage() {
   const router = useRouter();
@@ -23,7 +23,6 @@ export default function UploadPage() {
   const [error, setError] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [validationResult, setValidationResult] = useState(null);
-  const [validating, setValidating] = useState(false);
 
   // Subscribe to facet events
   useEffect(() => {
@@ -136,71 +135,41 @@ export default function UploadPage() {
     }
   };
 
-  // Validate file before upload - uses gedcomFiles facet
-  const handleValidate = async () => {
-    if (!file || !gedcomFiles) return;
+  const validateMut = useUploadAndValidateGedcom(gedcomFiles);
+  const createTreeMut = useCreateTree();
+  const validating = validateMut.isPending;
 
-    setValidating(true);
+  const handleValidate = () => {
+    if (!file || !gedcomFiles) return;
     setError(null);
     setValidationResult(null);
-
-    try {
-      // Step 1: Upload file using the gedcomFiles facet
-      const uploadResult = await gedcomFiles.uploadGedcom(file, treeName || file.name);
-      const fileId = uploadResult.fileId;
-
-      // Step 2: Validate using the gedcomFiles facet
-      const validationData = await gedcomFiles.validateFile(fileId);
-
-      setValidationResult({
-        ...validationData,
-        fileId,
-        uploadData: uploadResult.metadata,
-      });
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setValidating(false);
-    }
+    validateMut.mutate({ file, treeName }, {
+      onSuccess: (result) => setValidationResult(result),
+      onError: (err) => setError(err.message),
+    });
   };
 
-  // Handle final upload (create tree record)
-  const handleUpload = async () => {
+  const handleUpload = () => {
     if (!validationResult?.fileId) {
       setError('Please validate the file first');
       return;
     }
-
     setUploading(true);
     setError(null);
-
-    try {
-      // Create tree record in our database
-      const response = await authFetch('/api/trees', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fileId: validationResult.fileId,
-          name: treeName,
-          description,
-          isPublic,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create tree');
+    createTreeMut.mutate(
+      { fileId: validationResult.fileId, name: treeName, description, isPublic },
+      {
+        onSuccess: (data) => {
+          router.push(`/trees/${data.tree.id}`);
+        },
+        onError: (err) => {
+          setError(err.message);
+        },
+        onSettled: () => {
+          setUploading(false);
+        },
       }
-
-      const data = await response.json();
-      
-      // Redirect to the new tree
-      router.push(`/trees/${data.tree.id}`);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setUploading(false);
-    }
+    );
   };
 
   // Reset form

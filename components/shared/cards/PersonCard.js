@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Calendar, CalendarX } from 'lucide-react';
 import BaseCard from './BaseCard';
 import { Badge } from '../ui/badges';
 import { EntityIcon } from '../ui/metadata';
@@ -44,7 +45,7 @@ export default function PersonCard({
   const displayName = name || `${givenName || ''} ${surname || ''}`.trim() || 'Unknown';
 
   const personLink = treeId && id 
-    ? `/trees/${treeId}/individuals/${id}`
+    ? `/trees/${treeId}/individuals/${encodeURIComponent(id)}`
     : null;
 
   return (
@@ -110,17 +111,13 @@ export default function PersonCard({
           <div className="space-y-1.5 text-sm">
             {birthDate && (
               <div className="flex items-center gap-2 text-base-content/70">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+                <Calendar className="w-4 h-4 shrink-0" />
                 <span>Born: {birthDate}{birthPlace ? ` in ${birthPlace}` : ''}</span>
               </div>
             )}
             {deathDate && (
               <div className="flex items-center gap-2 text-base-content/70">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <CalendarX className="w-4 h-4 shrink-0" />
                 <span>Died: {deathDate}{deathPlace ? ` in ${deathPlace}` : ''}</span>
               </div>
             )}

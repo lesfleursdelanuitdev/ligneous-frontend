@@ -1,53 +1,23 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Users, Heart, MapPin, Calendar, CalendarDays, BookOpen, FileText } from 'lucide-react';
 import { DashboardLayout } from '@/components';
 import TreeOverviewSection from '@/components/features/trees/TreeOverviewSection';
+import TreeUpdatesSection from '@/components/features/trees/TreeUpdatesSection';
 import TreeOverviewToolbar from '@/components/features/trees/TreeOverviewToolbar';
 import TreeProfileHeader from '@/components/features/trees/TreeProfileHeader';
-import { authFetch } from '@/lib/api';
+import { useTreeMeta } from '@/hooks/queries/useTreeMeta';
 
 export default function TreeOverviewPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const [tree, setTree] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { data: metaData, isLoading: loading, error: queryError } = useTreeMeta(treeId);
+  const tree = metaData?.tree || null;
+  const error = queryError?.message || null;
   const [toolbarSection, setToolbarSection] = useState(null);
-
-  useEffect(() => {
-    if (!treeId) return;
-
-    let cancelled = false;
-
-    async function fetchTree() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await authFetch(`/api/trees/${treeId}/meta`);
-        const data = await res.json();
-
-        if (cancelled) return;
-        if (!res.ok) {
-          setError(data.error || 'Failed to load tree');
-          return;
-        }
-        setTree(data.tree);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err.message || 'Failed to load tree');
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    fetchTree();
-    return () => { cancelled = true; };
-  }, [treeId]);
 
   if (!treeId) {
     return (
@@ -137,6 +107,7 @@ export default function TreeOverviewPage() {
           ))}
             </div>
             <TreeOverviewSection />
+            <TreeUpdatesSection />
           </div>
         </div>
       </div>

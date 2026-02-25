@@ -30,12 +30,15 @@ model User {
   permissions            Permission[]
   grantedPermissions     Permission[]         @relation("PermissionGrantedBy")
   treeMaintainers        TreeMaintainer[]
+  treeContributors       TreeContributor[]
+  addedContributors      TreeContributor[]    @relation("ContributorAddedBy")
   accessRequests         AccessRequest[]
   respondedRequests      AccessRequest[]      @relation("RequestRespondedBy")
   addedMaintainers       TreeMaintainer[]     @relation("MaintainerAddedBy")
   addedOwners            TreeOwner[]          @relation("OwnerAddedBy")
   createdInvitationLinks InvitationLink[]     @relation("InvitationLinksCreated")
   invitationLinkUses     InvitationLinkUse[]  @relation("InvitationLinkUses")
+  stories                Story[]              @relation("StoryAuthor")
   albums                 Album[]
   albumMedia             AlbumMedia[]         @relation("AlbumMediaAddedBy")
   albumShares            AlbumShare[]
@@ -52,6 +55,8 @@ model User {
   reviewedSuggestions  Suggestion[]       @relation("SuggestionReviewer")
   researchNotes        ResearchNote[]
   notebooks            Notebook[]
+  researchTodoItems    ResearchTodoItem[]
+  researchLinks        ResearchLink[]
   sentMessages         Message[]          @relation("SentMessages")
   receivedMessages     Message[]          @relation("ReceivedMessages")
   createdMessageGroups MessageGroup[]
@@ -68,6 +73,7 @@ model User {
   contentComments ContentComment[]
   contentShares   ContentShare[]
   userFeeds       UserFeed[]
+  entityLikes     EntityLike[]
 
   // Notifications & activity
   notifications       Notification[]
@@ -146,15 +152,19 @@ model Tree {
   userIndividualLinks UserIndividualLink[]
   permissions         Permission[]
   treeMaintainers     TreeMaintainer[]
+  treeContributors    TreeContributor[]
   accessRequests      AccessRequest[]
   privateData         PrivateData[]
   invitationLinks     InvitationLink[]
+  stories             Story[]
 
   // Collaboration relations
   comments          Comment[]
   discussionThreads DiscussionThread[]
   suggestions       Suggestion[]
   researchNotes     ResearchNote[]
+  researchTodoItems ResearchTodoItem[]
+  researchLinks     ResearchLink[]
   messageGroups     MessageGroup[]
   userContent       UserContent[]
   follows           Follow[]
@@ -223,10 +233,11 @@ enum ResourceType {
 }
 
 enum AccessRequestType {
-  basic_access // Request read or write access to tree
-  individual_link // "This is me" - link to individual
-  maintainer_role // Request to become tree maintainer
-  owner_role // Request to become tree owner
+  basic_access      // Request read or write access to tree
+  individual_link   // "This is me" - link to individual
+  contributor_role  // Request to become tree contributor (write access to stories etc.)
+  maintainer_role   // Request to become tree maintainer
+  owner_role        // Request to become tree owner
 }
 
 model Permission {
@@ -268,6 +279,26 @@ model TreeMaintainer {
   @@index([treeId])
   @@index([userId])
   @@map("tree_maintainers")
+}
+
+// 6a. Tree Contributors Table
+// Contributors can author stories (and other user-created content) for a tree.
+// Granted by Tree Owners and Maintainers.
+model TreeContributor {
+  id        String   @id @default(uuid()) @db.Uuid
+  treeId    String   @map("tree_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  addedBy   String?  @map("added_by") @db.Uuid
+
+  tree  Tree  @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  adder User? @relation("ContributorAddedBy", fields: [addedBy], references: [id], onDelete: SetNull)
+
+  @@unique([treeId, userId])
+  @@index([treeId])
+  @@index([userId])
+  @@map("tree_contributors")
 }
 
 // 7. Access Requests Table
@@ -366,7 +397,64 @@ model InvitationLinkUse {
   @@map("invitation_link_uses")
 }
 
-// 11. Albums Table
+// 11. Stories Table
+// Long-form, user-authored narrative content attached to a tree.
+// Body is Markdown. Only tree owners, maintainers, and contributors can author stories.
+model Story {
+  id            String    @id @default(uuid()) @db.Uuid
+  treeId        String    @map("tree_id") @db.Uuid
+  authorId      String    @map("author_id") @db.Uuid
+  title         String    @db.VarChar(255)
+  body          String    @default("") @db.Text
+  excerpt       String?   @db.VarChar(500)
+  coverMediaId  String?   @map("cover_media_id") @db.VarChar(255)
+  isPublished   Boolean   @default(false) @map("is_published")
+  publishedAt   DateTime? @map("published_at") @db.Timestamptz(6)
+  tags          String[]
+  viewsCount    Int       @default(0) @map("views_count")
+  likesCount    Int       @default(0) @map("likes_count")
+  commentsCount Int       @default(0) @map("comments_count")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  tree     Tree           @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  author   User           @relation("StoryAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  subjects StorySubject[]
+
+  @@index([treeId])
+  @@index([authorId])
+  @@index([isPublished])
+  @@index([publishedAt])
+  @@index([createdAt])
+  @@index([treeId, isPublished])
+  @@index([tags])
+  @@map("stories")
+}
+
+// 11a. Story Subjects Table
+// A story can be "about" any number of GEDCOM entities (individuals, families,
+// places, or events). subject_id is the UUID from the GEDCOM entity tables.
+model StorySubject {
+  id          String           @id @default(uuid()) @db.Uuid
+  storyId     String           @map("story_id") @db.Uuid
+  subjectType StorySubjectType @map("subject_type")
+  subjectId   String           @map("subject_id") @db.VarChar(255)
+  subjectXref String?          @map("subject_xref") @db.VarChar(50)
+  fileId      String           @map("file_id") @db.VarChar(255)
+  sortOrder   Int              @default(0) @map("sort_order")
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  story Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, subjectType, subjectId])
+  @@index([storyId])
+  @@index([subjectType, subjectId])
+  @@index([fileId, subjectType, subjectId])
+  @@map("story_subjects")
+}
+
+// 12. Albums Table
 model Album {
   id           String   @id @default(uuid()) @db.Uuid
   userId       String   @map("user_id") @db.Uuid
@@ -462,6 +550,15 @@ enum EntityType {
   source
   place
   date
+  story
+}
+
+// Story subject types — the kinds of entities a story can be "about"
+enum StorySubjectType {
+  individual
+  family
+  place
+  event
 }
 
 // 16. Tagged Items Table (polymorphic - can tag any entity type)
@@ -536,17 +633,34 @@ model DiscussionThread {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tree     Tree?            @relation(fields: [treeId], references: [id], onDelete: Cascade)
-  creator  User             @relation("ThreadCreator", fields: [createdBy], references: [id], onDelete: Cascade)
-  posts    DiscussionPost[]
-  watchers User[]           @relation("ThreadWatchers")
-  follows  Follow[]
+  tree            Tree?                    @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  creator         User                     @relation("ThreadCreator", fields: [createdBy], references: [id], onDelete: Cascade)
+  posts           DiscussionPost[]
+  watchers        User[]                   @relation("ThreadWatchers")
+  follows         Follow[]
+  linkedEntities  DiscussionThreadEntity[]
 
   @@index([treeId])
   @@index([createdBy])
   @@index([category])
   @@index([tags]) // GIN index for array search
   @@map("discussion_threads")
+}
+
+// 18a. Discussion Thread Entity Link (junction: thread <-> individual/family)
+model DiscussionThreadEntity {
+  id         String   @id @default(uuid()) @db.Uuid
+  threadId   String   @map("thread_id") @db.Uuid
+  entityType String   @map("entity_type") @db.VarChar(50) // 'individual' | 'family'
+  entityId   String   @map("entity_id") @db.VarChar(255)  // XREF e.g. I1, F2
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  thread DiscussionThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@unique([threadId, entityType, entityId])
+  @@index([threadId])
+  @@index([entityType, entityId])
+  @@map("discussion_thread_entities")
 }
 
 // 19. Discussion Posts Table
@@ -569,6 +683,22 @@ model DiscussionPost {
   @@index([userId])
   @@index([createdAt])
   @@map("discussion_posts")
+}
+
+// 19a. Entity Likes (polymorphic: discussion_post, comment)
+model EntityLike {
+  id         String   @id @default(uuid()) @db.Uuid
+  entityType String   @map("entity_type") @db.VarChar(50) // 'discussion_post' | 'comment'
+  entityId   String   @map("entity_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([entityType, entityId, userId])
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@map("entity_likes")
 }
 
 // 20. Suggestions Table
@@ -652,6 +782,49 @@ model Notebook {
 
   @@index([userId])
   @@map("notebooks")
+}
+
+// 22a. Research Todo Items Table
+model ResearchTodoItem {
+  id          String    @id @default(uuid()) @db.Uuid
+  treeId      String    @map("tree_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  title       String    @db.VarChar(500)
+  description String?   @db.Text
+  status      String    @default("pending") @db.VarChar(50)
+  priority    Int       @default(0)
+  dueDate     DateTime? @map("due_date") @db.Date
+  entityType  String?   @map("entity_type") @db.VarChar(50)
+  entityId    String?   @map("entity_id") @db.Uuid
+  sortOrder   Int       @default(0) @map("sort_order")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tree Tree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([treeId])
+  @@index([userId])
+  @@map("research_todo_items")
+}
+
+// 22b. Research Links Table
+model ResearchLink {
+  id        String   @id @default(uuid()) @db.Uuid
+  treeId    String   @map("tree_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  label     String   @db.VarChar(500)
+  url       String   @db.Text
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tree Tree @relation(fields: [treeId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([treeId])
+  @@index([userId])
+  @@map("research_links")
 }
 
 // 23. Messages Table

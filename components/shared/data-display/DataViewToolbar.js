@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, SlidersHorizontal, ArrowUpDown, LayoutGrid, List } from 'lucide-react';
+import { Search, SlidersHorizontal, ArrowUpDown, LayoutGrid, List, MousePointerClick } from 'lucide-react';
 
 /**
  * DataViewToolbar — Icon toolbar with progressive disclosure.
@@ -23,11 +23,13 @@ export default function DataViewToolbar({
   hasSearch = true,
   hasFilters = false,
   hasSort = false,
+  hasSelectionMode = true,
 
   // Render props: when a section is active, parent provides the content
   renderSearchSection,
   renderFilterSection,
   renderSortSection,
+  renderSelectionSection,
 
   className = '',
 }) {
@@ -133,6 +135,14 @@ export default function DataViewToolbar({
             isActive={activeSection === 'sort'}
           />
         )}
+        {hasSelectionMode && (
+          <ToolbarIcon
+            icon={MousePointerClick}
+            label="Selection mode"
+            sectionKey="selection"
+            isActive={activeSection === 'selection'}
+          />
+        )}
 
         {/* View toggle — always visible, no section to expand */}
         <div className="flex items-center ml-auto">
@@ -184,6 +194,20 @@ export default function DataViewToolbar({
           >
             <div className="pt-2">
               {renderSortSection()}
+            </div>
+          </motion.div>
+        )}
+        {activeSection === 'selection' && renderSelectionSection && (
+          <motion.div
+            key="selection"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="pt-2">
+              {renderSelectionSection()}
             </div>
           </motion.div>
         )}

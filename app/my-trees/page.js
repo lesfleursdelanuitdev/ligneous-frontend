@@ -1,67 +1,42 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
-import { DashboardLayout, TreeCard } from '@/components';
+import { useState } from 'react';
+import { DashboardLayout } from '@/components';
+import TreeCard from '@/components/shared/cards/TreeCard';
 import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
-import { authFetch } from '@/lib/api';
+import { useMyTrees } from '@/hooks/queries/useTreesList';
+
+function transformTrees(trees = []) {
+  return trees.map((tree) => {
+    const primaryOwner = tree.owners?.find((o) => o.isPrimary)?.user || tree.owners?.[0]?.user;
+    return {
+      id: tree.id,
+      name: tree.name,
+      description: tree.description || '',
+      isPublic: tree.isPublic,
+      individualsCount: tree.individualsCount ?? 0,
+      familiesCount: tree.familiesCount ?? 0,
+      placesCount: tree.placesCount ?? 0,
+      eventsCount: tree.eventsCount ?? 0,
+      sourcesCount: tree.sourcesCount ?? 0,
+      notesCount: tree.notesCount ?? 0,
+      parseStatus: tree.parseStatus,
+      fileId: tree.fileId,
+      owner: primaryOwner
+        ? { name: primaryOwner.name || primaryOwner.username, username: primaryOwner.username }
+        : null,
+      owners: tree.owners,
+      updatedAt: tree.updatedAt,
+      createdAt: tree.createdAt,
+    };
+  });
+}
 
 export default function MyTreesPage() {
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const retryRef = useRef(null);
-
-  const fetchData = useCallback(async ({ search, advancedConditions, sort, sortDirection, page, perPage }) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const qs = new URLSearchParams();
-      qs.set('filter', 'owned');
-      qs.set('limit', String(perPage));
-      qs.set('offset', String((page - 1) * perPage));
-      if (search) qs.set('search', search);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const response = await authFetch(`/api/trees?${qs}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Failed to fetch trees');
-
-      const transformedTrees = (data.trees || []).map((tree) => {
-        const primaryOwner = tree.owners?.find((o) => o.isPrimary)?.user || tree.owners?.[0]?.user;
-        return {
-          id: tree.id,
-          name: tree.name,
-          description: tree.description || '',
-          isPublic: tree.isPublic,
-          individualsCount: tree.individualsCount ?? 0,
-          familiesCount: tree.familiesCount ?? 0,
-          placesCount: tree.placesCount ?? 0,
-          eventsCount: tree.eventsCount ?? 0,
-          sourcesCount: tree.sourcesCount ?? 0,
-          notesCount: tree.notesCount ?? 0,
-          parseStatus: tree.parseStatus,
-          fileId: tree.fileId,
-          owner: primaryOwner
-            ? { name: primaryOwner.name || primaryOwner.username, username: primaryOwner.username }
-            : null,
-          owners: tree.owners,
-          updatedAt: tree.updatedAt,
-          createdAt: tree.createdAt,
-        };
-      });
-
-      setItems(transformedTrees);
-      setTotalItems(data.pagination?.total ?? transformedTrees.length);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading, error, refetch } = useMyTrees(queryParams);
+  const items = transformTrees(data?.trees);
+  const totalItems = data?.pagination?.total ?? items.length;
 
   return (
     <DashboardLayout>
@@ -72,8 +47,8 @@ export default function MyTreesPage() {
 
       <DataViewContainer
         items={items}
-        loading={loading}
-        error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+        loading={isLoading}
+        error={error ? { message: error.message, onRetry: refetch } : null}
         emptyState={{
           title: 'No trees yet',
           message: 'Upload a GEDCOM file to create your first tree.',
@@ -126,7 +101,7 @@ export default function MyTreesPage() {
           { key: 'edit', label: 'Edit', href: () => '#' },
           { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
         ]}
-        onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+        onParamsChange={setQueryParams}
       />
     </DashboardLayout>
   );

@@ -1,0 +1,11 @@
+export { default as IndividualDetail } from './IndividualDetail';
+export { default as IndividualOverviewSection } from './IndividualOverviewSection';
+export { default as IndividualFamiliesSection } from './IndividualFamiliesSection';
+export { default as IndividualNotesSection } from './IndividualNotesSection';
+export { default as IndividualEventsSection } from './IndividualEventsSection';
+export { default as IndividualLinkedSection } from './IndividualLinkedSection';
+export { default as IndividualSection } from './IndividualSection';
+export { default as IndividualSectionTabs } from './IndividualSectionTabs';
+export { default as IndividualSectionTabsContent } from './IndividualSectionTabsContent';
+export { default as IndividualView } from './IndividualView';
+export { default as IndividualViewToolbar } from './IndividualViewToolbar';

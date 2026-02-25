@@ -42,6 +42,9 @@ export default function TreeProfileHeader({ tree }) {
           <button type="button" className="btn btn-primary btn-sm">
             Join
           </button>
+          <button type="button" className="btn btn-primary btn-sm">
+            Email maintainers
+          </button>
         </div>
       </div>
     </div>

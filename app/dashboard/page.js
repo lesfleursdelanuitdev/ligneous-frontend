@@ -1,80 +1,16 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { DashboardLayout, ExploreTrees, RecentActivity, PendingRequests, GlobalSearch } from '@/components';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { authFetch } from '@/lib/api';
+import { useDashboardStats } from '@/hooks/queries/useDashboardStats';
 
 export default function DashboardPage() {
   const { isReady, isAuthenticated, user, isSuperuser } = useRequireAuth('/login');
-  const [stats, setStats] = useState({
-    treesOwned: 0,
-    totalIndividuals: 0,
-    collaborators: 0,
-    pendingRequests: 0,
+  const { data: stats, isLoading: statsLoading } = useDashboardStats({
+    enabled: isReady && isAuthenticated,
   });
-  const [statsLoading, setStatsLoading] = useState(true);
-
-  // Log component mount and auth state
-  useEffect(() => {
-    console.log('[DashboardPage] Component mounted', {
-      isReady,
-      isAuthenticated,
-      hasUser: !!user,
-      userId: user?.id,
-      username: user?.username,
-      isSuperuser,
-    });
-  }, [isReady, isAuthenticated, user, isSuperuser]);
-
-  // Fetch dashboard stats
-  const fetchStats = useCallback(async () => {
-    if (!isReady || !isAuthenticated) {
-      console.log('[DashboardPage] Skipping stats fetch', { isReady, isAuthenticated });
-      return;
-    }
-    
-    console.log('[DashboardPage] Fetching dashboard stats', {
-      userId: user?.id,
-      username: user?.username,
-    });
-    
-    try {
-      setStatsLoading(true);
-      const response = await authFetch('/api/me/stats');
-      const data = await response.json();
-      
-      if (response.ok) {
-        console.log('[DashboardPage] Stats fetched successfully', {
-          treesOwned: data.treesOwned || 0,
-          totalIndividuals: data.totalIndividuals || 0,
-          collaborators: data.collaborators || 0,
-          pendingRequests: data.pendingRequests || 0,
-        });
-        setStats({
-          treesOwned: data.treesOwned || 0,
-          totalIndividuals: data.totalIndividuals || 0,
-          collaborators: data.collaborators || 0,
-          pendingRequests: data.pendingRequests || 0,
-        });
-      } else {
-        console.error('[DashboardPage] Stats fetch failed', {
-          status: response.status,
-          statusText: response.statusText,
-          data,
-        });
-      }
-    } catch (error) {
-      console.error('[DashboardPage] Failed to fetch stats:', error);
-    } finally {
-      setStatsLoading(false);
-    }
-  }, [isReady, isAuthenticated, user]);
-
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+  const safeStats = stats || { treesOwned: 0, totalIndividuals: 0, collaborators: 0, pendingRequests: 0 };
 
   // Show loading while checking auth
   if (!isReady) {
@@ -137,7 +73,7 @@ export default function DashboardPage() {
             </svg>
           }
           label="My Trees"
-          value={statsLoading ? '...' : stats.treesOwned.toString()}
+          value={statsLoading ? '...' : safeStats.treesOwned.toString()}
           color="emerald"
         />
         <StatCard 
@@ -148,7 +84,7 @@ export default function DashboardPage() {
             </svg>
           }
           label="Total People"
-          value={statsLoading ? '...' : stats.totalIndividuals.toLocaleString()}
+          value={statsLoading ? '...' : safeStats.totalIndividuals.toLocaleString()}
           color="blue"
         />
         <StatCard 
@@ -159,7 +95,7 @@ export default function DashboardPage() {
             </svg>
           }
           label="Collaborators"
-          value={statsLoading ? '...' : stats.collaborators.toString()}
+          value={statsLoading ? '...' : safeStats.collaborators.toString()}
           color="purple"
         />
         <StatCard 
@@ -170,9 +106,9 @@ export default function DashboardPage() {
             </svg>
           }
           label="Pending"
-          value={statsLoading ? '...' : stats.pendingRequests.toString()}
+          value={statsLoading ? '...' : safeStats.pendingRequests.toString()}
           color="amber"
-          highlight={stats.pendingRequests > 0}
+          highlight={safeStats.pendingRequests > 0}
         />
       </div>
 
@@ -288,6 +224,23 @@ export default function DashboardPage() {
                     <div>
                       <p className="font-medium text-base-content">Manage Users</p>
                       <p className="text-xs text-base-content/60">View, edit, deactivate users</p>
+                    </div>
+                  </Link>
+
+                  <Link 
+                    href="/admin/roles"
+                    className="flex items-center gap-3 p-3 rounded-lg hover:bg-base-200 transition-colors group"
+                  >
+                    <div className="w-10 h-10 rounded-lg bg-secondary/20 flex items-center justify-center text-secondary
+                                    group-hover:scale-110 transition-transform">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                              d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium text-base-content">Manage Roles</p>
+                      <p className="text-xs text-base-content/60">Define roles and permissions</p>
                     </div>
                   </Link>
 

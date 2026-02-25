@@ -175,7 +175,7 @@ export default function TreeCard({
 function StatItem({ icon: Icon, value, label }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Icon className="w-3.5 h-3.5 text-base-content/40 flex-shrink-0" />
+      <Icon size={14} className="text-base-content/40 shrink-0" />
       <span className="text-sm font-semibold text-base-content">{(value ?? 0).toLocaleString()}</span>
       <span className="text-xs text-base-content/50 truncate">{label}</span>
     </div>

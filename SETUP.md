@@ -51,7 +51,7 @@ ligneous-frontend/
    ```bash
    cp .env.example .env.local
    # .env.local should contain:
-   # GO_API_URL=http://localhost:8090
+   # LIB_API_URL=http://localhost:8091
    # NEXT_PUBLIC_API_URL=http://localhost:4000/api
    # (Gateway is built into frontend as Next.js API routes)
    ```

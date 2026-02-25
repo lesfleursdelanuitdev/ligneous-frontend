@@ -23,7 +23,7 @@ const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
 // Configuration
-const GO_API_URL = config.api.goApi.baseURL;
+const GO_API_URL = config.api.libApi.baseURL;
 const TESTDATA_DIR = '/apps/gedcom-go/testdata';
 
 // Files to upload with display names

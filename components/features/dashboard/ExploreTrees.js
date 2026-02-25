@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { TreeCard, TreeCardSkeleton } from '../trees';
+import SharedTreeCard from '@/components/shared/cards/TreeCard';
+import { TreeCardSkeleton } from '../trees';
 import { authFetch } from '@/lib/api';
 
 export default function ExploreTrees({ 
@@ -149,7 +150,7 @@ export default function ExploreTrees({
               key={tree.id}
               className={`animate-slide-up stagger-${index + 1}`}
             >
-              <TreeCard 
+              <SharedTreeCard
                 tree={tree}
                 variant={index === 0 ? 'featured' : 'default'}
                 onRequestAccess={handleRequestAccess}

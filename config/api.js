@@ -15,6 +15,16 @@ export const apiConfig = {
     timeout: 30000,
   },
 
+  // GEDCOM backend (ligneous-gedcom-lib-api on port 8091)
+  libApi: {
+    baseURL: env.LIB_API_URL,
+    timeout: 30000,
+  },
+  // Alias for scripts/tests that still reference goApi
+  get goApi() {
+    return this.libApi;
+  },
+
   // Get client-side API config (for browser)
   getClientConfig() {
     const clientEnv = getClientEnv();

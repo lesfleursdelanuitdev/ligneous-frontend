@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { GitMerge } from 'lucide-react';
-import { DashboardLayout, TreePageHeader } from '@/components';
-import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
-import { authFetch } from '@/lib/api';
+import { GitMerge, BarChart2, BarChart3 } from 'lucide-react';
+import { DashboardMainContentLayout } from '@/components';
+import BaseCard from '@/components/shared/cards/BaseCard';
+import { DataViewContainer, AddNewPlaceholder, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
+import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 
 const MONTH_ABBR = [
   '', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -38,60 +39,34 @@ function contextBadges(context) {
 export default function TreeDatesPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const retryRef = useRef(null);
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'dates', queryParams);
+  const items = data?.data || [];
+  const totalItems = data?.pagination?.total ?? 0;
 
-  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
-    if (!treeId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const qs = new URLSearchParams();
-      qs.set('limit', String(perPage));
-      qs.set('offset', String((page - 1) * perPage));
-      if (search) qs.set('search', search);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (filters?.context) qs.set('context', filters.context);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const res = await authFetch(`/api/trees/${treeId}/dates?${qs}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch dates');
-      setItems(data.data || []);
-      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
-    } catch (err) {
-      setError(err?.message || 'Failed to load dates');
-    } finally {
-      setLoading(false);
-    }
-  }, [treeId]);
-
-  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
+  if (!treeId) return <DashboardMainContentLayout treeId={treeId} title="Dates"><p className="text-base-content/60">Missing tree ID.</p></DashboardMainContentLayout>;
 
   return (
-    <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <TreePageHeader treeId={treeId} title="Dates" subtitle={`${totalItems} date entries`} />
-
+    <DashboardMainContentLayout treeId={treeId} title="Dates" subtitle={`${totalItems} date entries`}>
         <DataViewContainer
           items={items}
-          loading={loading}
-          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          loading={isLoading}
+          error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No dates', message: 'No dates found in this tree.' }}
           defaultView="list"
           renderCard={(row) => (
-            <Link href={`/trees/${treeId}/dates/${row.id}`} className="card bg-base-200 rounded-box p-4 hover:bg-base-300 transition-colors block">
-              <div className="font-medium">{row.original || '\u2014'}</div>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                {row.year && <span className="text-sm text-base-content/70">{row.year}</span>}
-                {row.month && <span className="text-xs text-base-content/50">{MONTH_ABBR[row.month]}</span>}
-                {row.day && <span className="text-xs text-base-content/50">Day {row.day}</span>}
-              </div>
-              {row.context && <div className="mt-2">{contextBadges(row.context)}</div>}
+            <Link href={`/trees/${treeId}/dates/${row.id}`} className="block h-full">
+              <BaseCard hoverable className="h-full transition-colors hover:bg-base-200/50">
+                <div className="space-y-3">
+                  <div className="font-medium text-base-content">{row.original || '\u2014'}</div>
+                  <div className="flex flex-wrap items-center gap-2 text-sm text-base-content/70">
+                    {row.year && <span>{row.year}</span>}
+                    {row.month && <span className="text-base-content/50">{MONTH_ABBR[row.month]}</span>}
+                    {row.day && <span className="text-base-content/50">Day {row.day}</span>}
+                  </div>
+                  {row.context && <div className="pt-2 border-t border-base-content/10">{contextBadges(row.context)}</div>}
+                </div>
+              </BaseCard>
             </Link>
           )}
           renderRow={(row) => (
@@ -124,11 +99,30 @@ export default function TreeDatesPage() {
             ]},
           ]}
           advancedSearchFields={[
-            { key: 'original', label: 'Date text' },
-            { key: 'year', label: 'Year' },
-            { key: 'month', label: 'Month' },
-            { key: 'day', label: 'Day' },
-            { key: 'date_type', label: 'Date type' },
+            { key: 'original',  label: 'Date text' },
+            { key: 'year',      label: 'Year',  type: 'number' },
+            { key: 'month',     label: 'Month', type: 'select', options: [
+              { value: '1',  label: 'January' },
+              { value: '2',  label: 'February' },
+              { value: '3',  label: 'March' },
+              { value: '4',  label: 'April' },
+              { value: '5',  label: 'May' },
+              { value: '6',  label: 'June' },
+              { value: '7',  label: 'July' },
+              { value: '8',  label: 'August' },
+              { value: '9',  label: 'September' },
+              { value: '10', label: 'October' },
+              { value: '11', label: 'November' },
+              { value: '12', label: 'December' },
+            ]},
+            { key: 'day',       label: 'Day',  type: 'number' },
+            { key: 'date_type', label: 'Date type', type: 'select', options: [
+              { value: 'birth',    label: 'Birth' },
+              { value: 'death',    label: 'Death' },
+              { value: 'marriage', label: 'Marriage' },
+              { value: 'divorce',  label: 'Divorce' },
+              { value: 'event',    label: 'Other event' },
+            ]},
           ]}
           sortOptions={[
             { value: 'year', label: 'Year' },
@@ -138,9 +132,11 @@ export default function TreeDatesPage() {
           defaultSort="year"
           totalItems={totalItems}
           defaultPerPage={10}
-          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          onParamsChange={setQueryParams}
           addNewComponent={<AddNewPlaceholder message="Add new date form coming soon." />}
           extraTabs={[
+            { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
+            { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
             { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge dates form coming soon." />, icon: GitMerge },
           ]}
           actions={[
@@ -149,7 +145,6 @@ export default function TreeDatesPage() {
             { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
           ]}
         />
-      </div>
-    </DashboardLayout>
+    </DashboardMainContentLayout>
   );
 }

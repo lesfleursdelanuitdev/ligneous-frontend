@@ -25,7 +25,7 @@ Frontend application for the Ligneous GEDCOM genealogy platform.
 ### Prerequisites
 
 - Node.js 18+
-- Go API running (default: http://localhost:8090)
+- GEDCOM lib API running (ligneous-gedcom-lib-api, default: http://localhost:8091)
 
 **Note:** The gateway is built into this frontend as Next.js API routes, so no separate gateway service is needed.
 
@@ -41,7 +41,7 @@ Create a `.env.local` file:
 
 ```bash
 # Go API URL (Next.js API routes will proxy to this)
-GO_API_URL=http://localhost:8090
+LIB_API_URL=http://localhost:8091
 
 # Frontend API base URL (Next.js API routes run on same port as frontend)
 NEXT_PUBLIC_API_URL=http://localhost:4000/api

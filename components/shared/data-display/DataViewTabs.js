@@ -58,7 +58,7 @@ export default function DataViewTabs({
       </div>
       <div
         role="tabpanel"
-        className="rounded-b-box border-x border-b border-base-content/10 bg-base-100 p-4 pt-5 -mt-px"
+        className="rounded-bl-box rounded-br-box rounded-tr-box border border-base-content/10 bg-base-100 p-4 pt-5 -mt-px"
       >
         {current.content}
       </div>

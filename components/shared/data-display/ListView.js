@@ -20,6 +20,9 @@ export default function ListView({
   onSort,
   sortKey,
   sortDirection = 'asc',
+  isSelectionMode = false,
+  onSelectAll,
+  isSelectAllChecked = false,
   className = '',
 }) {
   if (!items || items.length === 0) return null;
@@ -38,6 +41,19 @@ export default function ListView({
           <thead className="bg-base-200">
             <tr>
               {headers.map((header) => {
+                if (header.key === '_select' && isSelectionMode && onSelectAll) {
+                  return (
+                    <th key={header.key} scope="col" className="px-4 py-3 w-10">
+                      <input
+                        type="checkbox"
+                        className="checkbox checkbox-sm"
+                        checked={isSelectAllChecked}
+                        onChange={onSelectAll}
+                        aria-label="Select all on page"
+                      />
+                    </th>
+                  );
+                }
                 const isActive = header.sortable && sortKey === header.key;
                 return (
                   <th

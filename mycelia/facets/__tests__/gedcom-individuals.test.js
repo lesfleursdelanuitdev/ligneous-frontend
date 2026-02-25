@@ -62,7 +62,7 @@ describe('useGedcomIndividuals Facet', () => {
     
     // Build the test system
     system = await buildTestSystem('ligneous-test', {
-      goApiUrl: 'http://localhost:8090'
+      goApiUrl: 'http://localhost:8091'
     });
     
     // Enable listeners for event testing
@@ -149,7 +149,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals'
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals'
       );
     });
 
@@ -170,7 +170,7 @@ describe('useGedcomIndividuals Facet', () => {
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/file-123/individuals?limit=10&offset=0&name=John'
+        'http://localhost:8091/api/v1/files/file-123/individuals?limit=10&offset=0&name=John'
       );
     });
 
@@ -234,7 +234,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/file-123/individuals/I1'
+        'http://localhost:8091/api/v1/files/file-123/individuals/I1'
       );
     });
 
@@ -299,7 +299,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals/search',
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals/search',
         expect.objectContaining({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -357,7 +357,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals/I0263/parents'
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals/I0263/parents'
       );
     });
 
@@ -413,7 +413,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals/I0069/children'
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals/I0069/children'
       );
     });
 
@@ -456,7 +456,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals/I0266/siblings'
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals/I0266/siblings'
       );
     });
 
@@ -499,7 +499,7 @@ describe('useGedcomIndividuals Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/xavier-test-123/individuals/I0176/spouses'
+        'http://localhost:8091/api/v1/files/xavier-test-123/individuals/I0176/spouses'
       );
     });
 

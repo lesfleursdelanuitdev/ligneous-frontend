@@ -1,63 +1,45 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
-import { GitMerge } from 'lucide-react';
-import { DashboardLayout, TreePageHeader } from '@/components';
-import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
-import { authFetch } from '@/lib/api';
+import { GitMerge, BarChart2, BarChart3 } from 'lucide-react';
+import { DashboardMainContentLayout } from '@/components';
+import PlaceCard from '@/components/shared/cards/PlaceCard';
+import { DataViewContainer, AddNewPlaceholder, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
+import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 
 export default function TreePlacesPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const retryRef = useRef(null);
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'places', queryParams);
+  const items = data?.data || [];
+  const totalItems = data?.pagination?.total ?? 0;
 
-  const fetchData = useCallback(async ({ search, advancedConditions, sort, sortDirection, page, perPage }) => {
-    if (!treeId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const qs = new URLSearchParams();
-      qs.set('limit', String(perPage));
-      qs.set('offset', String((page - 1) * perPage));
-      if (search) qs.set('search', search);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const res = await authFetch(`/api/trees/${treeId}/places?${qs}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch places');
-      setItems(data.data || []);
-      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
-    } catch (err) {
-      setError(err?.message || 'Failed to load places');
-    } finally {
-      setLoading(false);
-    }
-  }, [treeId]);
-
-  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
+  if (!treeId) return <DashboardMainContentLayout treeId={treeId} title="Places"><p className="text-base-content/60">Missing tree ID.</p></DashboardMainContentLayout>;
 
   return (
-    <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <TreePageHeader treeId={treeId} title="Places" subtitle={`${totalItems} places`} />
-
+    <DashboardMainContentLayout treeId={treeId} title="Places" subtitle={`${totalItems} places`}>
         <DataViewContainer
           items={items}
-          loading={loading}
-          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          loading={isLoading}
+          error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No places', message: 'No places found in this tree.' }}
           defaultView="list"
           renderCard={(row) => (
-            <div className="card bg-base-200 rounded-box p-4">
-              <div className="font-medium">{row.name ?? row.place ?? row.value ?? row.id}</div>
-            </div>
+            <PlaceCard
+              treeId={treeId}
+              place={{
+                id: row.id,
+                name: row.name ?? row.place ?? row.value,
+                normalizedName: row.normalizedName,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                eventsCount: row.eventsCount ?? 0,
+                individualsCount: row.individualsCount ?? 0,
+                familiesCount: row.familiesCount ?? 0,
+              }}
+            />
           )}
           renderRow={(row) => (
             <td className="px-6 py-4">{row.name ?? row.place ?? row.value ?? row.id}</td>
@@ -76,9 +58,11 @@ export default function TreePlacesPage() {
           defaultSort="name"
           totalItems={totalItems}
           defaultPerPage={10}
-          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          onParamsChange={setQueryParams}
           addNewComponent={<AddNewPlaceholder message="Add new place form coming soon." />}
           extraTabs={[
+            { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
+            { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
             { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge places form coming soon." />, icon: GitMerge },
           ]}
           actions={[
@@ -87,7 +71,6 @@ export default function TreePlacesPage() {
             { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
           ]}
         />
-      </div>
-    </DashboardLayout>
+    </DashboardMainContentLayout>
   );
 }

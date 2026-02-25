@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Test Go API endpoints used by tree overview and families page.
 # Usage: ./scripts/test-go-endpoints.sh [GO_API_URL] [FILE_ID]
-# Example: ./scripts/test-go-endpoints.sh http://localhost:8090 abc123-def456
+# Example: ./scripts/test-go-endpoints.sh http://localhost:8091 abc123-def456
 
 set -e
-GO_API_URL="${1:-${NEXT_PUBLIC_GO_API_URL:-http://localhost:8090}}"
+GO_API_URL="${1:-${LIB_API_URL:-${NEXT_PUBLIC_GO_API_URL:-http://localhost:8091}}}"
 FILE_ID="${2}"
 
 if [ -z "$FILE_ID" ]; then
@@ -15,7 +15,7 @@ if [ -z "$FILE_ID" ]; then
   echo ""
   echo "Get a FILE_ID from your database: Tree.fileId (e.g. from Prisma: tree.fileId)"
   echo ""
-  echo "Example: $0 http://localhost:8090 your-file-id-here"
+  echo "Example: $0 http://localhost:8091 your-file-id-here"
   exit 1
 fi
 

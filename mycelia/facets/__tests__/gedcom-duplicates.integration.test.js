@@ -5,7 +5,7 @@
  * and REAL API calls to the Go API server.
  * 
  * Prerequisites:
- * - Go API server must be running on http://localhost:8090
+ * - GEDCOM lib API server must be running on http://localhost:8091
  * - GEDCOM test files must be available in /apps/gedcom-go/testdata
  * 
  * These are integration tests, not unit tests!
@@ -17,7 +17,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 const TESTDATA_PATH = '/apps/gedcom-go/testdata';
-const GO_API_URL = 'http://localhost:8090';
+const GO_API_URL = 'http://localhost:8091';
 
 describe('useGedcomDuplicates Integration Tests', () => {
   let system;
@@ -28,7 +28,7 @@ describe('useGedcomDuplicates Integration Tests', () => {
   let uploadedFileId2 = null;
 
   beforeAll(async () => {
-    console.log('\n⚠️  Integration tests require Go API running at', GO_API_URL);
+    console.log('\n⚠️  Integration tests require GEDCOM lib API running at', GO_API_URL);
     console.log('   Start the Go API with: cd /apps/ligneous-gedcom-api && ./api\n');
     
     // Build system

@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Pencil, Download, ImageIcon, GitFork } from 'lucide-react';
+import { Pencil, Download, ImageIcon, GitFork, LayoutDashboard, MessageCircle, Newspaper, Sparkles } from 'lucide-react';
 
 /**
- * Toolbar for tree overview page. Edit, Export, Media, Fork/Clone.
+ * Toolbar for tree overview page. Overview, Edit, Export, Media, Fork/Clone, Discussions, Blog, AI.
  * Icon toolbar with progressive disclosure (labels on hover).
  * Clicking an icon expands its section below. Placeholder UI for now.
  */
@@ -61,6 +61,12 @@ export default function TreeOverviewToolbar({
     <div className={`flex flex-col ${className}`}>
       <div className="w-full flex items-center gap-1 flex-wrap px-4 py-3 border-b border-base-content/10">
         <ToolbarIcon
+          icon={LayoutDashboard}
+          label="Overview"
+          sectionKey="overview"
+          isActive={activeSection === 'overview'}
+        />
+        <ToolbarIcon
           icon={Pencil}
           label="Edit tree"
           sectionKey="edit"
@@ -84,9 +90,41 @@ export default function TreeOverviewToolbar({
           sectionKey="fork"
           isActive={activeSection === 'fork'}
         />
+        <ToolbarIcon
+          icon={MessageCircle}
+          label="Discussions"
+          sectionKey="discussions"
+          isActive={activeSection === 'discussions'}
+        />
+        <ToolbarIcon
+          icon={Newspaper}
+          label="Blog"
+          sectionKey="blog"
+          isActive={activeSection === 'blog'}
+        />
+        <ToolbarIcon
+          icon={Sparkles}
+          label="AI assistant"
+          sectionKey="ai"
+          isActive={activeSection === 'ai'}
+        />
       </div>
 
       <AnimatePresence mode="wait">
+        {activeSection === 'overview' && (
+          <motion.div
+            key="overview"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden px-4"
+          >
+            <div className="pt-2 pb-4 rounded-lg bg-base-200/50 p-4 text-sm text-base-content/70">
+              Summary and interesting facts about this tree.
+            </div>
+          </motion.div>
+        )}
         {activeSection === 'edit' && (
           <motion.div
             key="edit"
@@ -140,6 +178,48 @@ export default function TreeOverviewToolbar({
           >
             <div className="pt-2 pb-4 rounded-lg bg-base-200/50 p-4 text-sm text-base-content/70">
               Fork or clone this tree to create your own copy. (Coming soon)
+            </div>
+          </motion.div>
+        )}
+        {activeSection === 'discussions' && (
+          <motion.div
+            key="discussions"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden px-4"
+          >
+            <div className="pt-2 pb-4 rounded-lg bg-base-200/50 p-4 text-sm text-base-content/70">
+              View and participate in discussions about this tree. (Coming soon)
+            </div>
+          </motion.div>
+        )}
+        {activeSection === 'blog' && (
+          <motion.div
+            key="blog"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden px-4"
+          >
+            <div className="pt-2 pb-4 rounded-lg bg-base-200/50 p-4 text-sm text-base-content/70">
+              Read blog posts and articles about this tree. (Coming soon)
+            </div>
+          </motion.div>
+        )}
+        {activeSection === 'ai' && (
+          <motion.div
+            key="ai"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden px-4"
+          >
+            <div className="pt-2 pb-4 rounded-lg bg-base-200/50 p-4 text-sm text-base-content/70">
+              Chat with AI to explore this tree, find connections, and get insights. (Coming soon)
             </div>
           </motion.div>
         )}

@@ -3,9 +3,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authFetch } from '@/lib/api';
+import { useAdminTreeDetail } from '@/hooks/queries/useAdminData';
+import { queryKeys } from '@/lib/query-keys';
 
 // Tab components
 function OwnersTab({ tree, onRefresh, allUsers }) {
@@ -629,24 +632,18 @@ export default function AdminTreeDetailPage() {
     superuserRedirectTo: '/dashboard',
   });
   
-  const [tree, setTree] = useState(null);
+  const queryClient = useQueryClient();
+  const { data: treeData, isLoading: treeLoading, error: treeError } = useAdminTreeDetail(
+    isReady && isSuperuser ? params.id : null
+  );
+  const tree = treeData?.tree || null;
+  const error = treeError?.message || null;
+
   const [allUsers, setAllUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('owners');
 
-  const fetchTree = useCallback(async () => {
-    try {
-      const response = await authFetch(`/api/admin/trees/${params.id}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setTree(data.tree);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [params.id]);
+  const invalidateTree = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.treeDetail(params.id) });
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -657,14 +654,15 @@ export default function AdminTreeDetailPage() {
       }
     } catch (err) {
       console.error('Failed to fetch users:', err);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!isReady || !isSuperuser) return;
-    fetchTree();
     fetchUsers();
-  }, [isReady, isSuperuser, fetchTree, fetchUsers]);
+  }, [isReady, isSuperuser, fetchUsers]);
 
   // Show loading while checking auth
   if (!isReady) {
@@ -682,7 +680,7 @@ export default function AdminTreeDetailPage() {
     return null;
   }
 
-  if (loading) {
+  if (treeLoading || loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-20">
@@ -753,11 +751,11 @@ export default function AdminTreeDetailPage() {
 
         {/* Tab Content */}
         <div className="bg-base-100 rounded-lg border border-base-content/10 p-6">
-          {activeTab === 'owners' && <OwnersTab tree={tree} onRefresh={fetchTree} allUsers={allUsers} />}
-          {activeTab === 'maintainers' && <MaintainersTab tree={tree} onRefresh={fetchTree} allUsers={allUsers} />}
-          {activeTab === 'permissions' && <PermissionsTab tree={tree} onRefresh={fetchTree} allUsers={allUsers} />}
-          {activeTab === 'invitations' && <InvitationsTab tree={tree} onRefresh={fetchTree} />}
-          {activeTab === 'links' && <UserLinksTab tree={tree} onRefresh={fetchTree} />}
+          {activeTab === 'owners' && <OwnersTab tree={tree} onRefresh={invalidateTree} allUsers={allUsers} />}
+          {activeTab === 'maintainers' && <MaintainersTab tree={tree} onRefresh={invalidateTree} allUsers={allUsers} />}
+          {activeTab === 'permissions' && <PermissionsTab tree={tree} onRefresh={invalidateTree} allUsers={allUsers} />}
+          {activeTab === 'invitations' && <InvitationsTab tree={tree} onRefresh={invalidateTree} />}
+          {activeTab === 'links' && <UserLinksTab tree={tree} onRefresh={invalidateTree} />}
         </div>
 
         {/* Pending Requests */}

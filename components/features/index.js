@@ -12,6 +12,9 @@ export { TreeCard, TreeCardSkeleton } from './trees';
 // Comments
 export { CommentList, CommentItem, CommentForm } from './comments';
 
+// Individuals
+export { IndividualDetail } from './individuals';
+
 // Family Tree (to be added)
 // export { PedigreeChart, TreeControls, PersonCard } from './family-tree';
 

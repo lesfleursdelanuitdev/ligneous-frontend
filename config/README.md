@@ -22,7 +22,7 @@ config/
 import { config } from '@/config';
 
 // Access API config
-const goApiUrl = config.api.goApi.baseURL;
+const libApiUrl = config.api.libApi.baseURL;
 
 // Access auth config
 const jwtSecret = config.auth.jwtSecret;
@@ -61,7 +61,8 @@ All environment variables are accessed through `config.env`:
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET` - JWT signing secret
 - `JWT_EXPIRES_IN` - JWT expiration time (default: '7d')
-- `GO_API_URL` / `NEXT_PUBLIC_GO_API_URL` - Go API base URL
+- `LIB_API_URL` - GEDCOM lib API base URL (ligneous-gedcom-lib-api, default http://localhost:8091)
+- `GO_API_URL` / `NEXT_PUBLIC_GO_API_URL` - Legacy names for same backend (default 8091)
 - `NEXT_PUBLIC_API_URL` - Next.js API routes base URL
 
 ## Benefits

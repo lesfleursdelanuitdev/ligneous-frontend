@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DashboardLayout, TreePageHeader } from '@/components';
-import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
-import { authFetch } from '@/lib/api';
+import { BarChart2, BarChart3 } from 'lucide-react';
+import { DashboardMainContentLayout } from '@/components';
+import BaseCard from '@/components/shared/cards/BaseCard';
+import { DataViewContainer, AddNewPlaceholder, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
+import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 
 function LinkedTo({ items, treeId }) {
   if (!items || items.length === 0) return <span className="text-base-content/40">{'\u2014'}</span>;
@@ -36,58 +38,30 @@ function LinkedTo({ items, treeId }) {
 export default function TreeEventsPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const retryRef = useRef(null);
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'events', queryParams);
+  const items = data?.data || [];
+  const totalItems = data?.pagination?.total ?? 0;
 
-  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
-    if (!treeId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const qs = new URLSearchParams();
-      qs.set('limit', String(perPage));
-      qs.set('offset', String((page - 1) * perPage));
-      if (search) qs.set('search', search);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (filters?.event_type) qs.set('event_type', filters.event_type);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const res = await authFetch(`/api/trees/${treeId}/events?${qs}`);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(typeof data?.error === 'string' ? data.error : 'Failed to fetch events');
-      setItems(data.data || []);
-      setTotalItems(data.pagination?.total ?? data.data?.length ?? 0);
-    } catch (err) {
-      setError(err?.message || 'Failed to load events');
-    } finally {
-      setLoading(false);
-    }
-  }, [treeId]);
-
-  if (!treeId) return <DashboardLayout><div className="p-6"><p className="text-base-content/60">Missing tree ID.</p></div></DashboardLayout>;
+  if (!treeId) return <DashboardMainContentLayout treeId={treeId} title="Events"><p className="text-base-content/60">Missing tree ID.</p></DashboardMainContentLayout>;
 
   return (
-    <DashboardLayout>
-      <div className="p-6 max-w-6xl mx-auto space-y-6">
-        <TreePageHeader treeId={treeId} title="Events" subtitle={`${totalItems} events`} />
-
+    <DashboardMainContentLayout treeId={treeId} title="Events" subtitle={`${totalItems} events`}>
         <DataViewContainer
           items={items}
-          loading={loading}
-          error={error ? { message: error, onRetry: () => retryRef.current?.() } : null}
+          loading={isLoading}
+          error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No events', message: 'No events found in this tree.' }}
           defaultView="list"
           renderCard={(row) => (
-            <div className="card bg-base-200 rounded-box p-4 space-y-1">
-              <div className="font-medium">{row.customType || row.eventType || 'Event'}</div>
-              <div className="text-sm text-base-content/70">{row.date?.original ?? '—'}</div>
-              {row.place?.original && <div className="text-sm text-base-content/70">{row.place.original}</div>}
-              <div className="pt-1"><LinkedTo items={row.linkedTo} treeId={treeId} /></div>
-            </div>
+            <BaseCard>
+              <div className="space-y-3">
+                <div className="font-medium text-base-content">{row.customType || row.eventType || 'Event'}</div>
+                <div className="text-sm text-base-content/70">{row.date?.original ?? '—'}</div>
+                {row.place?.original && <div className="text-sm text-base-content/70">{row.place.original}</div>}
+                <div className="pt-1 border-t border-base-content/10"><LinkedTo items={row.linkedTo} treeId={treeId} /></div>
+              </div>
+            </BaseCard>
           )}
           renderRow={(row) => (
             <>
@@ -106,10 +80,26 @@ export default function TreeEventsPage() {
           searchPlaceholder="Search events..."
           searchLabel="Event type, date, or place"
           advancedSearchFields={[
-            { key: 'event_type', label: 'Event type' },
+            { key: 'event_type', label: 'Event type', type: 'select', options: [
+              { value: 'BIRT', label: 'Birth' },
+              { value: 'DEAT', label: 'Death' },
+              { value: 'MARR', label: 'Marriage' },
+              { value: 'DIV',  label: 'Divorce' },
+              { value: 'BURI', label: 'Burial' },
+              { value: 'BAPM', label: 'Baptism' },
+              { value: 'CHR',  label: 'Christening' },
+              { value: 'CENS', label: 'Census' },
+              { value: 'RESI', label: 'Residence' },
+              { value: 'OCCU', label: 'Occupation' },
+              { value: 'EMIG', label: 'Emigration' },
+              { value: 'IMMI', label: 'Immigration' },
+              { value: 'NATU', label: 'Naturalization' },
+              { value: 'GRAD', label: 'Graduation' },
+              { value: 'RETI', label: 'Retirement' },
+            ]},
             { key: 'custom_type', label: 'Custom type' },
-            { key: 'place', label: 'Place' },
-            { key: 'year', label: 'Year' },
+            { key: 'place',       label: 'Place' },
+            { key: 'year',        label: 'Year', type: 'number' },
           ]}
           filters={[
             { key: 'event_type', label: 'Event Type', type: 'select', options: [
@@ -128,15 +118,18 @@ export default function TreeEventsPage() {
           defaultSort="event_type"
           totalItems={totalItems}
           defaultPerPage={10}
-          onParamsChange={(p) => { retryRef.current = () => fetchData(p); fetchData(p); }}
+          onParamsChange={setQueryParams}
           addNewComponent={<AddNewPlaceholder message="Add new event form coming soon." />}
+          extraTabs={[
+            { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
+            { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
+          ]}
           actions={[
             { key: 'view', label: 'View', href: () => '#' },
             { key: 'edit', label: 'Edit', href: () => '#' },
             { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
           ]}
         />
-      </div>
-    </DashboardLayout>
+    </DashboardMainContentLayout>
   );
 }

@@ -3,9 +3,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authFetch } from '@/lib/api';
+import { useAdminUserDetail } from '@/hooks/queries/useAdminData';
+import { useAdminUpdateUser } from '@/hooks/mutations/useAdminMutations';
+import { queryKeys } from '@/lib/query-keys';
 
 // Component to manage user-individual links
 function IndividualLinksSection({ userId, onRefresh }) {
@@ -251,64 +255,30 @@ export default function AdminUserDetailPage() {
     superuserRedirectTo: '/dashboard',
   });
   
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const queryClient = useQueryClient();
+  const { data: userData, isLoading: loading, error: queryError } = useAdminUserDetail(
+    isReady && isSuperuser ? params.id : null
+  );
+  const user = userData?.user || null;
+  const error = queryError?.message || null;
+  const updateUserMut = useAdminUpdateUser();
+  const actionLoading = updateUserMut.isPending;
 
-  const fetchUser = useCallback(async () => {
-    try {
-      const response = await authFetch(`/api/admin/users/${params.id}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      setUser(data.user);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [params.id]);
+  const invalidateUser = () => queryClient.invalidateQueries({ queryKey: queryKeys.admin.userDetail(params.id) });
 
-  useEffect(() => {
-    if (!isReady || !isSuperuser) return;
-    fetchUser();
-  }, [isReady, isSuperuser, fetchUser]);
-
-  const handleToggleStatus = async () => {
-    setActionLoading(true);
-    try {
-      const response = await authFetch(`/api/admin/users/${params.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !user.isActive }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      fetchUser();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
+  const handleToggleStatus = () => {
+    updateUserMut.mutate(
+      { userId: params.id, updates: { isActive: !user.isActive } },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
-  const handleToggleSuperuser = async () => {
+  const handleToggleSuperuser = () => {
     if (!confirm(`Are you sure you want to ${user.isWebsiteOwner ? 'remove' : 'grant'} superuser status?`)) return;
-    setActionLoading(true);
-    try {
-      const response = await authFetch(`/api/admin/users/${params.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isWebsiteOwner: !user.isWebsiteOwner }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      fetchUser();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
+    updateUserMut.mutate(
+      { userId: params.id, updates: { isWebsiteOwner: !user.isWebsiteOwner } },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
   const formatDate = (dateString) => {
@@ -485,7 +455,7 @@ export default function AdminUserDetailPage() {
         </div>
 
         {/* Linked Individuals */}
-        <IndividualLinksSection userId={params.id} onRefresh={fetchUser} />
+        <IndividualLinksSection userId={params.id} onRefresh={invalidateUser} />
 
         {/* Pending Access Requests */}
         {user.accessRequests?.length > 0 && (

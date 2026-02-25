@@ -24,14 +24,14 @@
 │  │  Next.js API Routes (/api/*) - Gateway               │   │
 │  │  - Authentication endpoints                           │   │
 │  │  - Tree management endpoints                         │   │
-│  │  - Proxy to Go API                                   │   │
+│  │  - Proxy to GEDCOM lib API                           │   │
 │  └───────────────────────┬──────────────────────────────┘   │
 └───────────────────────────┬───────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
-│              Go API (ligneous-gedcom-api)                   │
-│  - Port 8090                                                 │
+│              GEDCOM Lib API (ligneous-gedcom-lib-api)        │
+│  - Port 8091                                                 │
 │  - File processing, parsing, queries                        │
 │  - Source of truth for GEDCOM data                          │
 └─────────────────────────────────────────────────────────────┘
@@ -114,7 +114,7 @@ Next.js API Route: app/api/trees/[id]/individuals/route.js
 1. Verify JWT token
 2. Check user can access tree
 3. Lookup tree_id → file_id
-4. Proxy: GET http://localhost:8090/api/v1/files/{file_id}/individuals
+4. Proxy: GET http://localhost:8091/api/v1/files/{file_id}/individuals
   ↓
 Go API returns individuals
   ↓
@@ -132,14 +132,14 @@ React component re-renders
 ### Current Setup
 
 - **Frontend + API Routes:** Port `4000`
-- **Go API:** Port `8090`
+- **GEDCOM lib API:** Port `8091` (ligneous-gedcom-lib-api)
 
 ### Environment Variables
 
 **`.env.local`:**
 ```bash
 # Go API URL (for server-side proxying)
-GO_API_URL=http://localhost:8090
+LIB_API_URL=http://localhost:8091
 
 # Frontend API base URL (for client-side requests)
 NEXT_PUBLIC_API_URL=http://localhost:4000/api
@@ -181,7 +181,7 @@ The frontend will need a database for:
 ### Old Architecture (Separate Gateway)
 
 ```
-Frontend (4000) → Gateway (5000) → Go API (8090)
+Frontend (4000) → Gateway (5000) → GEDCOM lib API (8091)
 ```
 
 **Issues:**
@@ -193,7 +193,7 @@ Frontend (4000) → Gateway (5000) → Go API (8090)
 ### New Architecture (Built-in Gateway)
 
 ```
-Frontend + API Routes (4000) → Go API (8090)
+Frontend + API Routes (4000) → GEDCOM lib API (8091)
 ```
 
 **Benefits:**

@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { Users, Heart, MapPin, Calendar, BookOpen, FileText } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components';
-import { DataViewContainer } from '@/components/shared/data-display';
+import BaseCard from '@/components/shared/cards/BaseCard';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
-import { authFetch } from '@/lib/api';
+import { useAdminTrees } from '@/hooks/queries/useAdminData';
+import { useAdminUpdateTree, useAdminDeleteTree } from '@/hooks/mutations/useAdminMutations';
 
 function StatItem({ icon: Icon, value, label }) {
   return (
     <div className="flex items-center gap-1.5">
-      <Icon className="w-3.5 h-3.5 opacity-50 flex-shrink-0" />
-      <span>{(value ?? 0).toLocaleString()} {label}</span>
+      <Icon size={14} className="text-base-content/40 shrink-0" />
+      <span className="text-sm font-semibold text-base-content">{(value ?? 0).toLocaleString()}</span>
+      <span className="text-xs text-base-content/50 truncate">{label}</span>
     </div>
   );
 }
@@ -36,56 +40,67 @@ function AdminTreeCard({ tree }) {
     notesCount = 0,
   } = tree;
   return (
-    <div className="card bg-base-100 border border-base-content/10 overflow-hidden">
-      <div className="p-4 border-b border-base-content/10">
-        <div className="flex items-center gap-2 flex-wrap mb-2">
-          <Link href={`/admin/trees/${tree.id}`} className="text-lg font-semibold link link-primary">
-            {tree.name}
-          </Link>
-          <span className={`badge badge-sm ${tree.isPublic ? 'badge-success' : 'badge-error'}`}>
-            {tree.isPublic ? 'Public' : 'Private'}
-          </span>
-        </div>
-        <p className="text-sm text-base-content/60">
-          File ID: <code className="bg-base-200 px-1 rounded">{tree.fileId}</code>
-        </p>
-        {tree.description && (
-          <p className="text-sm text-base-content/70 mt-2 line-clamp-2">{tree.description}</p>
-        )}
-      </div>
-      <div className="px-4 py-3 grid grid-cols-3 gap-x-3 gap-y-2 text-sm text-base-content/70 border-b border-base-content/10">
-        <StatItem icon={Users} value={individualsCount} label="people" />
-        <StatItem icon={Heart} value={familiesCount} label="families" />
-        <StatItem icon={MapPin} value={placesCount} label="places" />
-        <StatItem icon={Calendar} value={eventsCount} label="events" />
-        <StatItem icon={BookOpen} value={sourcesCount} label="sources" />
-        <StatItem icon={FileText} value={notesCount} label="notes" />
-      </div>
-      <div className="p-4 bg-base-200 grid grid-cols-2 gap-3 text-xs">
+    <BaseCard className="h-full flex flex-col">
+      <div className="space-y-3 flex-1 min-w-0">
+        {/* Header */}
         <div>
-          <div className="text-base-content/60 mb-0.5">Owners</div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <Link
+              href={`/admin/trees/${tree.id}`}
+              className="text-lg font-semibold link link-hover link-primary truncate block"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {tree.name}
+            </Link>
+            <span className={`badge badge-sm ${tree.isPublic ? 'badge-success' : 'badge-error'}`}>
+              {tree.isPublic ? 'Public' : 'Private'}
+            </span>
+          </div>
+          <p className="text-sm text-base-content/60">
+            File ID: <code className="bg-base-200 px-1 rounded text-xs">{tree.fileId}</code>
+          </p>
+          {tree.description && (
+            <p className="text-sm text-base-content/70 mt-1 line-clamp-2">{tree.description}</p>
+          )}
+        </div>
+
+        {/* Stats — same pattern as individuals-page entity cards */}
+        <div className="grid grid-cols-3 gap-x-3 gap-y-2 py-2 border-t border-base-content/10">
+          <StatItem icon={Users} value={individualsCount} label="people" />
+          <StatItem icon={Heart} value={familiesCount} label="families" />
+          <StatItem icon={MapPin} value={placesCount} label="places" />
+          <StatItem icon={Calendar} value={eventsCount} label="events" />
+          <StatItem icon={BookOpen} value={sourcesCount} label="sources" />
+          <StatItem icon={FileText} value={notesCount} label="notes" />
+        </div>
+
+        {/* Owners & Pending — single footer row */}
+        <div className="pt-2 border-t border-base-content/10 space-y-1.5 text-xs text-base-content/60">
+          <div>
+            <span className="text-base-content/50">Owners </span>
             {(tree.owners || []).slice(0, 2).map((o) => (
-              <span key={o.id} className={`badge badge-xs ${o.isPrimary ? 'badge-secondary' : 'badge-ghost'}`}>
+              <span key={o.id} className={`badge badge-xs mr-1 ${o.isPrimary ? 'badge-secondary' : 'badge-ghost'}`}>
                 {o.isPrimary && '👑 '}{o.username}
               </span>
             ))}
             {(tree.owners?.length || 0) > 2 && (
-              <span className="text-base-content/60">+{tree.owners.length - 2}</span>
+              <span className="text-base-content/50">+{tree.owners.length - 2}</span>
             )}
           </div>
+          <div>
+            <span className="text-base-content/50">Pending </span>
+            <span className="text-base-content/70">
+              {(tree.counts?.pendingRequests ?? 0)} requests, {(tree.counts?.activeInvitations ?? 0)} invites
+            </span>
+          </div>
         </div>
-        <div>
-          <div className="text-base-content/60 mb-0.5">Pending</div>
-          <span className="text-base-content/70">
-            {(tree.counts?.pendingRequests ?? 0)} requests, {(tree.counts?.activeInvitations ?? 0)} invites
-          </span>
+
+        {/* Dates */}
+        <div className="pt-2 border-t border-base-content/10 text-xs text-base-content/50">
+          Created {formatDate(tree.createdAt)} • Updated {formatDate(tree.updatedAt)}
         </div>
       </div>
-      <div className="px-4 py-2 text-xs text-base-content/60 border-t border-base-content/10">
-        Created {formatDate(tree.createdAt)} • Updated {formatDate(tree.updatedAt)}
-      </div>
-    </div>
+    </BaseCard>
   );
 }
 
@@ -95,70 +110,29 @@ export default function AdminTreesPage() {
     superuserRedirectTo: '/dashboard',
   });
 
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const retryRef = useRef(null);
-  const latestParams = useRef(null);
+  const queryClient = useQueryClient();
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading: loading, error: queryError, refetch } = useAdminTrees(queryParams);
+  const items = data?.trees || [];
+  const totalItems = data?.pagination?.total ?? 0;
+  const error = queryError?.message || null;
+  const updateTree = useAdminUpdateTree();
+  const deleteTreeMut = useAdminDeleteTree();
+  const actionLoading = updateTree.isPending || deleteTreeMut.isPending;
 
-  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const qs = new URLSearchParams();
-      qs.set('page', String(page));
-      qs.set('limit', String(perPage));
-      if (search) qs.set('search', search);
-      if (filters?.visibility && filters.visibility !== 'all') qs.set('visibility', filters.visibility);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const res = await authFetch(`/api/admin/trees?${qs}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch trees');
-
-      setItems(data.trees || []);
-      setTotalItems(data.pagination?.total ?? 0);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refetch = () => {
-    if (latestParams.current) fetchData(latestParams.current);
+  const handleToggleVisibility = (tree) => {
+    updateTree.mutate(
+      { treeId: tree.id, updates: { isPublic: !tree.isPublic } },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
-  const handleToggleVisibility = async (tree) => {
-    try {
-      const res = await authFetch(`/api/admin/trees/${tree.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isPublic: !tree.isPublic }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update tree');
-      refetch();
-    } catch (err) {
-      alert(err.message);
-    }
-  };
-
-  const handleDeleteTree = async (tree) => {
+  const handleDeleteTree = (tree) => {
     if (!confirm(`Are you sure you want to DELETE "${tree.name}"?\n\nThis will remove ALL associated data. This action CANNOT be undone!`)) return;
-    try {
-      const res = await authFetch(`/api/admin/trees/${tree.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete tree');
-      refetch();
-    } catch (err) {
-      alert(err.message);
-    }
+    deleteTreeMut.mutate(
+      { treeId: tree.id },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
   if (!isReady) {
@@ -192,7 +166,7 @@ export default function AdminTreesPage() {
         <DataViewContainer
           items={items}
           loading={loading}
-          error={error ? { message: error, onRetry: refetch } : null}
+          error={error ? { message: error, onRetry: () => refetch() } : null}
           emptyState={{ title: 'No trees found', message: 'Try adjusting your search or filters.' }}
           defaultView="list"
           renderCard={(tree) => <AdminTreeCard tree={tree} />}
@@ -234,8 +208,12 @@ export default function AdminTreesPage() {
           searchPlaceholder="Search by name or file ID..."
           searchLabel="Name or file ID"
           advancedSearchFields={[
-            { key: 'name', label: 'Name' },
-            { key: 'fileId', label: 'File ID' },
+            { key: 'name',       label: 'Name' },
+            { key: 'fileId',     label: 'File ID' },
+            { key: 'visibility', label: 'Visibility', type: 'select', options: [
+              { value: 'public',  label: 'Public' },
+              { value: 'private', label: 'Private' },
+            ]},
           ]}
           filters={[
             { key: 'visibility', label: 'Visibility', type: 'select', options: [
@@ -256,11 +234,8 @@ export default function AdminTreesPage() {
             { key: 'toggle', label: 'Toggle visibility', onClick: (t) => !actionLoading && handleToggleVisibility(t) },
             { key: 'delete', label: 'Delete', variant: 'danger', onClick: (t) => !actionLoading && handleDeleteTree(t) },
           ]}
-          onParamsChange={(p) => {
-            latestParams.current = p;
-            retryRef.current = () => fetchData(p);
-            fetchData(p);
-          }}
+          addNewComponent={<AddNewPlaceholder title="Add Tree" />}
+          onParamsChange={setQueryParams}
         />
       </div>
     </DashboardLayout>

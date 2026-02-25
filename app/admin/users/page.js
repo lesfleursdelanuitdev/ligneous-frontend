@@ -1,11 +1,16 @@
 'use client';
 
-import { useState, useCallback, useRef } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { DashboardLayout } from '@/components';
-import { DataViewContainer } from '@/components/shared/data-display';
+import BaseCard from '@/components/shared/cards/BaseCard';
+import { DataViewContainer, AddNewPlaceholder } from '@/components/shared/data-display';
 import { useRequireAuth } from '@/hooks/useRequireAuth';
 import { authFetch } from '@/lib/api';
+import { useAdminUsers } from '@/hooks/queries/useAdminData';
+import { useAdminUpdateUser, useAdminDeleteUser } from '@/hooks/mutations/useAdminMutations';
+import { queryKeys } from '@/lib/query-keys';
 
 function formatDate(dateString) {
   if (!dateString) return 'Never';
@@ -47,95 +52,37 @@ export default function AdminUsersPage() {
     superuserRedirectTo: '/dashboard',
   });
 
-  const [items, setItems] = useState([]);
-  const [totalItems, setTotalItems] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
-  const retryRef = useRef(null);
-  const latestParams = useRef(null);
+  const queryClient = useQueryClient();
+  const [queryParams, setQueryParams] = useState({});
+  const { data, isLoading: loading, error: queryError, refetch } = useAdminUsers(queryParams);
+  const items = data?.users || [];
+  const totalItems = data?.pagination?.total ?? 0;
+  const error = queryError?.message || null;
+  const updateUser = useAdminUpdateUser();
+  const deleteUser = useAdminDeleteUser();
+  const actionLoading = updateUser.isPending || deleteUser.isPending;
 
-  const fetchData = useCallback(async ({ search, advancedConditions, filters, sort, sortDirection, page, perPage }) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const qs = new URLSearchParams();
-      qs.set('page', String(page));
-      qs.set('limit', String(perPage));
-      if (search) qs.set('search', search);
-      if (filters?.status && filters.status !== 'all') qs.set('status', filters.status);
-      if (sort) qs.set('sort', sort);
-      qs.set('order', sortDirection);
-      if (advancedConditions?.length > 0) qs.set('advanced_conditions', JSON.stringify(advancedConditions));
-
-      const res = await authFetch(`/api/admin/users?${qs}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to fetch users');
-
-      setItems(data.users || []);
-      setTotalItems(data.pagination?.total ?? 0);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const refetch = () => {
-    if (latestParams.current) fetchData(latestParams.current);
+  const handleToggleStatus = (user) => {
+    updateUser.mutate(
+      { userId: user.id, updates: { isActive: !user.isActive } },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
-  const handleToggleStatus = async (user) => {
-    setActionLoading(true);
-    try {
-      const res = await authFetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: !user.isActive }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update user');
-      refetch();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
-  const handleToggleSuperuser = async (user) => {
+  const handleToggleSuperuser = (user) => {
     if (!confirm(`Are you sure you want to ${user.isWebsiteOwner ? 'remove' : 'grant'} superuser status for ${user.username}?`)) return;
-    setActionLoading(true);
-    try {
-      const res = await authFetch(`/api/admin/users/${user.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isWebsiteOwner: !user.isWebsiteOwner }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update user');
-      refetch();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
+    updateUser.mutate(
+      { userId: user.id, updates: { isWebsiteOwner: !user.isWebsiteOwner } },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
-  const handleDeleteUser = async (user) => {
+  const handleDeleteUser = (user) => {
     if (!confirm(`Are you sure you want to DELETE user ${user.username}? This action cannot be undone!`)) return;
-    setActionLoading(true);
-    try {
-      const res = await authFetch(`/api/admin/users/${user.id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to delete user');
-      refetch();
-    } catch (err) {
-      alert(err.message);
-    } finally {
-      setActionLoading(false);
-    }
+    deleteUser.mutate(
+      { userId: user.id },
+      { onError: (err) => alert(err.message) }
+    );
   };
 
   if (!isReady) {
@@ -167,29 +114,31 @@ export default function AdminUsersPage() {
         <DataViewContainer
           items={items}
           loading={loading}
-          error={error ? { message: error, onRetry: refetch } : null}
+          error={error ? { message: error, onRetry: () => refetch() } : null}
           emptyState={{ title: 'No users found', message: 'Try adjusting your search or filters.' }}
           defaultView="list"
           renderCard={(user) => (
-            <div className="card bg-base-100 border border-base-content/10 rounded-box p-4 space-y-3">
-              <div className="flex items-center gap-3">
-                <UserAvatar username={user.username} />
-                <div className="min-w-0 flex-1">
-                  <Link href={`/admin/users/${user.id}`} className="font-medium link link-primary truncate block">
-                    {user.username}
-                  </Link>
-                  <div className="text-sm text-base-content/60 truncate">{user.email}</div>
+            <BaseCard>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <UserAvatar username={user.username} />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/admin/users/${user.id}`} className="font-medium link link-primary truncate block">
+                      {user.username}
+                    </Link>
+                    <div className="text-sm text-base-content/60 truncate">{user.email}</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <StatusBadge isActive={user.isActive} />
+                  <RoleBadge isWebsiteOwner={user.isWebsiteOwner} />
+                </div>
+                <div className="pt-2 border-t border-base-content/10 text-xs text-base-content/60 space-y-0.5">
+                  <div>Owned: {user.treesOwned ?? 0} &middot; Maintained: {user.treesMaintained ?? 0}</div>
+                  <div>Last login: {formatDate(user.lastLoginAt)}</div>
                 </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge isActive={user.isActive} />
-                <RoleBadge isWebsiteOwner={user.isWebsiteOwner} />
-              </div>
-              <div className="text-xs text-base-content/60 space-y-0.5">
-                <div>Owned: {user.treesOwned ?? 0} &middot; Maintained: {user.treesMaintained ?? 0}</div>
-                <div>Last login: {formatDate(user.lastLoginAt)}</div>
-              </div>
-            </div>
+            </BaseCard>
           )}
           renderRow={(user) => (
             <>
@@ -227,8 +176,16 @@ export default function AdminUsersPage() {
           searchLabel="Username, email, or name"
           advancedSearchFields={[
             { key: 'username', label: 'Username' },
-            { key: 'email', label: 'Email' },
-            { key: 'name', label: 'Name' },
+            { key: 'email',    label: 'Email' },
+            { key: 'name',     label: 'Name' },
+            { key: 'status',   label: 'Status', type: 'select', options: [
+              { value: 'active',   label: 'Active' },
+              { value: 'inactive', label: 'Inactive' },
+            ]},
+            { key: 'role', label: 'Role', type: 'select', options: [
+              { value: 'owner',  label: 'Website owner' },
+              { value: 'member', label: 'Member' },
+            ]},
           ]}
           filters={[
             {
@@ -273,11 +230,8 @@ export default function AdminUsersPage() {
               onClick: (user) => !actionLoading && handleDeleteUser(user),
             },
           ]}
-          onParamsChange={(p) => {
-            latestParams.current = p;
-            retryRef.current = () => fetchData(p);
-            fetchData(p);
-          }}
+          addNewComponent={<AddNewPlaceholder title="Add User" />}
+          onParamsChange={setQueryParams}
         />
       </div>
     </DashboardLayout>

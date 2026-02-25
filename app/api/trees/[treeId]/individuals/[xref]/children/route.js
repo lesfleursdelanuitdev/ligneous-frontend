@@ -4,7 +4,8 @@ import { resolveTreeAccess } from '@/lib/tree-access';
 
 export async function GET(request, { params }) {
   try {
-    const { treeId, xref } = await params;
+    const { treeId, xref: rawXref } = await params;
+    const xref = decodeURIComponent(rawXref);
     const { fileUuid, error } = await resolveTreeAccess(request, treeId);
     if (error) return error;
 

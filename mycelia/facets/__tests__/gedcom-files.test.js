@@ -34,7 +34,7 @@ describe('useGedcomFiles Facet', () => {
     
     // Build the test system
     system = await buildTestSystem('ligneous-test', {
-      goApiUrl: 'http://localhost:8090'
+      goApiUrl: 'http://localhost:8091'
     });
     
     // Enable listeners for event testing
@@ -114,7 +114,7 @@ describe('useGedcomFiles Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files',
+        'http://localhost:8091/api/v1/files',
         expect.objectContaining({
           method: 'POST',
           body: expect.any(FormData)
@@ -228,7 +228,7 @@ describe('useGedcomFiles Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/file-123'
+        'http://localhost:8091/api/v1/files/file-123'
       );
     });
 
@@ -274,7 +274,7 @@ describe('useGedcomFiles Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files'
+        'http://localhost:8091/api/v1/files'
       );
     });
 
@@ -329,7 +329,7 @@ describe('useGedcomFiles Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/file-123/validate',
+        'http://localhost:8091/api/v1/files/file-123/validate',
         expect.objectContaining({
           method: 'POST'
         })
@@ -405,7 +405,7 @@ describe('useGedcomFiles Facet', () => {
 
       // Check API call
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:8090/api/v1/files/file-123',
+        'http://localhost:8091/api/v1/files/file-123',
         expect.objectContaining({
           method: 'DELETE'
         })

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { DashboardLayout } from '@/components';
-import { authFetch } from '@/lib/api';
+import { useDateDetail } from '@/hooks/queries/useDateDetail';
 import { Baby, Skull, Heart, Unlink, CalendarDays, User, Users as UsersIcon } from 'lucide-react';
 
 const MONTH_NAMES = [
@@ -66,7 +65,7 @@ function EventCard({ evt, treeId }) {
 
         {evt.individualXref && (
           <Link
-            href={`/trees/${treeId}/individuals/${evt.individualXref}`}
+            href={`/trees/${treeId}/individuals/${encodeURIComponent(evt.individualXref)}`}
             className="inline-flex items-center gap-1.5 text-sm link link-primary"
           >
             <User className="w-3.5 h-3.5" />
@@ -89,7 +88,7 @@ function EventCard({ evt, treeId }) {
                 <span key={i} className="inline-flex items-center gap-1 text-sm">
                   {p.type === 'individual' ? (
                     <Link
-                      href={`/trees/${treeId}/individuals/${p.xref}`}
+                      href={`/trees/${treeId}/individuals/${encodeURIComponent(p.xref)}`}
                       className="link link-primary"
                     >
                       {p.name || p.xref}
@@ -120,29 +119,8 @@ export default function DateDetailPage() {
   const params = useParams();
   const treeId = params?.treeId;
   const dateId = params?.dateId;
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const fetchData = useCallback(async () => {
-    if (!treeId || !dateId) return;
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await authFetch(`/api/trees/${treeId}/dates/${dateId}`);
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(json.error || 'Failed to fetch date details');
-      }
-      setData(json);
-    } catch (err) {
-      setError(err.message || 'Failed to load');
-    } finally {
-      setLoading(false);
-    }
-  }, [treeId, dateId]);
-
-  useEffect(() => { fetchData(); }, [fetchData]);
+  const { data, isLoading: loading, error: queryError, refetch } = useDateDetail(treeId, dateId);
+  const error = queryError?.message || null;
 
   if (!treeId || !dateId) {
     return (
@@ -213,7 +191,7 @@ export default function DateDetailPage() {
         {error && (
           <div className="alert alert-error flex items-center justify-between gap-4">
             <span>{error}</span>
-            <button type="button" className="btn btn-sm btn-ghost" onClick={fetchData}>Try again</button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={refetch}>Try again</button>
           </div>
         )}
 
