@@ -1,5 +1,8 @@
 // Shared UI components - reusable across features
 
+// Events (timeline, etc.)
+export * from './events';
+
 // Layout / Page headers
 export { default as TreePageHeader } from './TreePageHeader';
 

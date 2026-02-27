@@ -23,7 +23,7 @@ export default function IndividualSectionTabs({ tabs = [], activeId, onChange })
             title={tab.label}
             aria-pressed={isActive}
           >
-            {Icon && <Icon size={18} />}
+            {Icon && <span className="shrink-0 flex items-center justify-center"><Icon size={20} /></span>}
             {tab.count != null && tab.count > 0 && (
               <span className="badge badge-xs">{tab.count}</span>
             )}

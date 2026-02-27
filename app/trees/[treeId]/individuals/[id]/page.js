@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { Pencil } from 'lucide-react';
 import { DashboardMainContentLayout, IndividualDetail } from '@/components';
 import { CommentList } from '@/components/features/comments';
 import { useIndividualDetail } from '@/hooks/queries/useIndividualDetail';
@@ -10,10 +12,26 @@ function stripSlashes(name) {
   return name.replace(/\//g, '').replace(/\s+/g, ' ').trim();
 }
 
+function decodeUntilStable(str) {
+  if (!str || typeof str !== 'string') return str;
+  let out = str;
+  let prev = '';
+  while (prev !== out) {
+    try {
+      prev = out;
+      out = decodeURIComponent(out);
+    } catch {
+      break;
+    }
+  }
+  return out;
+}
+
 export default function IndividualDetailPage() {
   const params = useParams();
   const treeId = params?.treeId;
-  const entityId = params?.id;
+  const entityIdRaw = params?.id;
+  const entityId = decodeUntilStable(entityIdRaw) || entityIdRaw;
   const { data: individual, isLoading, error } = useIndividualDetail(treeId, entityId);
 
   const displayName = individual ? stripSlashes(individual.fullName) || individual.xref : '';
@@ -58,6 +76,15 @@ export default function IndividualDetailPage() {
       treeId={treeId}
       title={displayName}
       breadcrumbs={breadcrumbs}
+      actions={
+        <Link
+          href={`/trees/${treeId}/individuals/${encodeURIComponent(individual?.xref ?? entityId ?? '')}/edit`}
+          className="btn btn-primary btn-sm gap-2"
+        >
+          <Pencil size={16} />
+          Edit
+        </Link>
+      }
     >
       <IndividualDetail individual={individual} treeId={treeId} />
 

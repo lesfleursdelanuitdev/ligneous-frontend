@@ -127,13 +127,6 @@ export default function AdminTreesPage() {
     );
   };
 
-  const handleDeleteTree = (tree) => {
-    if (!confirm(`Are you sure you want to DELETE "${tree.name}"?\n\nThis will remove ALL associated data. This action CANNOT be undone!`)) return;
-    deleteTreeMut.mutate(
-      { treeId: tree.id },
-      { onError: (err) => alert(err.message) }
-    );
-  };
 
   if (!isReady) {
     return (
@@ -232,7 +225,20 @@ export default function AdminTreesPage() {
           actions={[
             { key: 'view', label: 'Manage', href: (t) => `/admin/trees/${t.id}` },
             { key: 'toggle', label: 'Toggle visibility', onClick: (t) => !actionLoading && handleToggleVisibility(t) },
-            { key: 'delete', label: 'Delete', variant: 'danger', onClick: (t) => !actionLoading && handleDeleteTree(t) },
+            {
+              key: 'delete',
+              label: 'Delete',
+              variant: 'danger',
+              confirmMessage: (t) => (
+                <>
+                  <p className="font-medium">Delete tree &quot;{t.name}&quot;?</p>
+                  <p className="mt-2 text-base-content/70">This will remove ALL associated data. This action cannot be undone.</p>
+                </>
+              ),
+              performDelete: async (t) => {
+                await deleteTreeMut.mutateAsync({ treeId: t.id });
+              },
+            },
           ]}
           addNewComponent={<AddNewPlaceholder title="Add Tree" />}
           onParamsChange={setQueryParams}

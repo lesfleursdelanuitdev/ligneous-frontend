@@ -20,7 +20,7 @@ function MediaCard({ media, Icon }) {
   return (
     <div className="card bg-base-200/50 border border-base-content/10 rounded-box overflow-hidden">
       <div className="aspect-square bg-base-300 flex items-center justify-center">
-        <Icon size={32} className="text-base-content/30" />
+        <span className="text-base-content/30 shrink-0 inline-flex"><Icon size={32} /></span>
       </div>
       <div className="p-3 space-y-1">
         <p className="text-sm font-medium truncate">{media.title || media.fileRef || 'Untitled'}</p>

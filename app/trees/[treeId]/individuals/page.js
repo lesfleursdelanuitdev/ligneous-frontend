@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { GitMerge, BarChart2, BarChart3, Users } from 'lucide-react';
 import { DashboardMainContentLayout, PersonCard } from '@/components';
@@ -11,6 +11,41 @@ import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 function stripGedcomSlashes(name) {
   if (!name) return name;
   return name.replace(/\//g, '').replace(/\s+/g, ' ').trim();
+}
+
+const FILTER_LABELS = {
+  given_name: 'Given Name',
+  surname: 'Surname',
+  sex: 'Sex',
+  living: 'Living',
+  has_children: 'Has Children',
+  has_spouse: 'Has Spouse',
+  birth_year: 'Birth Year',
+  birth_place: 'Birth Place',
+  search: 'Search',
+};
+
+const SEX_LABELS = { M: 'Male', F: 'Female', U: 'Unknown' };
+const BOOLEAN_LABELS = { true: 'Yes', false: 'No' };
+
+function getActiveFiltersList(params) {
+  if (!params) return [];
+  const list = [];
+  if (params.search?.trim()) {
+    list.push({ label: 'Search', value: params.search });
+  }
+  const filters = params.filters || {};
+  const filterKeys = ['given_name', 'surname', 'sex', 'living', 'has_children', 'has_spouse', 'birth_year', 'birth_place'];
+  for (const key of filterKeys) {
+    const value = filters[key];
+    if (value === undefined || value === null || String(value).trim() === '') continue;
+    const label = FILTER_LABELS[key] || key.replace(/_/g, ' ');
+    let displayValue = String(value);
+    if (key === 'sex') displayValue = SEX_LABELS[value] || displayValue;
+    else if (['living', 'has_children', 'has_spouse'].includes(key)) displayValue = BOOLEAN_LABELS[value] || displayValue;
+    list.push({ label, value: displayValue });
+  }
+  return list;
 }
 
 function mapIndividualFromApi(indi, treeId) {
@@ -33,11 +68,15 @@ function mapIndividualFromApi(indi, treeId) {
 
 export default function TreeIndividualsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const treeId = params?.treeId;
+  const givenNameFromUrl = searchParams?.get('given_name');
+  const surnameFromUrl = searchParams?.get('surname');
   const [queryParams, setQueryParams] = useState({});
   const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'individuals', queryParams);
   const items = (data?.data || []).map((i) => mapIndividualFromApi(i, treeId));
   const totalItems = data?.pagination?.total ?? 0;
+  const activeFilters = getActiveFiltersList(queryParams);
 
   if (!treeId) {
     return (
@@ -53,6 +92,15 @@ export default function TreeIndividualsPage() {
       title="Individuals"
       subtitle={`${totalItems} people in this tree`}
     >
+        {activeFilters.length > 0 && (
+          <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-base-content/70 mb-4">
+            {activeFilters.map(({ label, value }) => (
+              <li key={label}>
+                <span className="font-medium text-base-content/80">{label}:</span> {value}
+              </li>
+            ))}
+          </ul>
+        )}
         <DataViewContainer
           items={items}
           loading={isLoading}
@@ -76,7 +124,7 @@ export default function TreeIndividualsPage() {
             { label: 'Name', key: 'name', sortable: true },
             { label: 'Birth', key: 'birth_year', sortable: true },
             { label: 'Death', key: 'death_year', sortable: true },
-            { label: 'Sex', key: 'sex', sortable: false },
+            { label: 'Sex', key: 'sex', sortable: true },
           ]}
           searchPlaceholder="Search individuals by name..."
           searchLabel="Name"
@@ -104,7 +152,14 @@ export default function TreeIndividualsPage() {
               { value: 'false', label: 'No' },
             ]},
           ]}
+          defaultFilterValues={
+            (givenNameFromUrl || surnameFromUrl)
+              ? { ...(givenNameFromUrl && { given_name: givenNameFromUrl }), ...(surnameFromUrl && { surname: surnameFromUrl }) }
+              : {}
+          }
           filters={[
+            { key: 'given_name', label: 'Given Name', type: 'text' },
+            { key: 'surname', label: 'Surname', type: 'text' },
             { key: 'sex', label: 'Sex', type: 'select', options: [{ value: 'M', label: 'Male' }, { value: 'F', label: 'Female' }, { value: 'U', label: 'Unknown' }] },
             { key: 'living', label: 'Living', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
             { key: 'has_children', label: 'Has Children', type: 'select', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
@@ -115,6 +170,7 @@ export default function TreeIndividualsPage() {
             { value: 'name', label: 'Name' },
             { value: 'birth_year', label: 'Birth Year' },
             { value: 'death_year', label: 'Death Year' },
+            { value: 'sex', label: 'Gender' },
           ]}
           defaultSort="name"
           defaultSortDirection="asc"

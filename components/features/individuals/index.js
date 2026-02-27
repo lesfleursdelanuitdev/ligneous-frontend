@@ -1,4 +1,10 @@
 export { default as IndividualDetail } from './IndividualDetail';
+export { default as IndividualEdit } from './IndividualEdit';
+export { default as IndividualEditOverviewSection } from './IndividualEditOverviewSection';
+export { default as IndividualEditFamiliesSection } from './IndividualEditFamiliesSection';
+export { default as IndividualEditNotesSection } from './IndividualEditNotesSection';
+export { default as IndividualEditEventsSection } from './IndividualEditEventsSection';
+export { default as IndividualEditLinkedSection } from './IndividualEditLinkedSection';
 export { default as IndividualOverviewSection } from './IndividualOverviewSection';
 export { default as IndividualFamiliesSection } from './IndividualFamiliesSection';
 export { default as IndividualNotesSection } from './IndividualNotesSection';

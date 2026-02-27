@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { BarChart2, BarChart3 } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
 import GivenNameCard from '@/components/shared/cards/GivenNameCard';
-import { DataViewContainer, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
+import { DataViewContainer, GivenNamesCharts, GivenNamesStatistics } from '@/components/shared/data-display';
 import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 
 export default function TreeGivenNamesPage() {
@@ -26,25 +27,37 @@ export default function TreeGivenNamesPage() {
           error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No given names', message: 'No given names found in this tree.' }}
           defaultView="list"
-          renderCard={(row) => (
-            <GivenNameCard
-              treeId={treeId}
-              givenName={{
-                name: row.givenName ?? row.name ?? row.value,
-                normalizedName: row.normalizedName,
-                individualsCount: row.frequency ?? row.count ?? 0,
-                malesCount: row.malesCount ?? 0,
-                femalesCount: row.femalesCount ?? 0,
-                unknownCount: row.unknownCount ?? 0,
-              }}
-            />
-          )}
-          renderRow={(row) => (
-            <>
-              <td className="px-6 py-4">{row.givenName ?? row.name ?? row.value}</td>
-              <td className="px-6 py-4">{row.frequency ?? row.count ?? 0}</td>
-            </>
-          )}
+          renderCard={(row) => {
+            const name = row.givenName ?? row.name ?? row.value ?? '';
+            return (
+              <Link href={`/trees/${treeId}/individuals?given_name=${encodeURIComponent(name)}`} className="block">
+                <GivenNameCard
+                  treeId={treeId}
+                  givenName={{
+                    name,
+                    normalizedName: row.normalizedName,
+                    individualsCount: row.frequency ?? row.count ?? 0,
+                    malesCount: row.malesCount ?? 0,
+                    femalesCount: row.femalesCount ?? 0,
+                    unknownCount: row.unknownCount ?? 0,
+                  }}
+                />
+              </Link>
+            );
+          }}
+          renderRow={(row) => {
+            const name = row.givenName ?? row.name ?? row.value ?? '';
+            return (
+              <>
+                <td className="px-6 py-4">
+                  <Link href={`/trees/${treeId}/individuals?given_name=${encodeURIComponent(name)}`} className="link link-primary">
+                    {name}
+                  </Link>
+                </td>
+                <td className="px-6 py-4">{row.frequency ?? row.count ?? 0}</td>
+              </>
+            );
+          }}
           listHeaders={[
             { label: 'Given Name', key: 'name', sortable: true },
             { label: 'Count', key: 'frequency', sortable: true },
@@ -64,8 +77,8 @@ export default function TreeGivenNamesPage() {
           defaultPerPage={10}
           onParamsChange={setQueryParams}
           extraTabs={[
-            { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
-            { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
+            { key: 'charts', label: 'Charts', content: <GivenNamesCharts treeId={treeId} />, icon: BarChart2 },
+            { key: 'statistics', label: 'Statistics', content: <GivenNamesStatistics treeId={treeId} />, icon: BarChart3 },
           ]}
         />
     </DashboardMainContentLayout>

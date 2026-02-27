@@ -13,7 +13,7 @@ export { TreeCard, TreeCardSkeleton } from './trees';
 export { CommentList, CommentItem, CommentForm } from './comments';
 
 // Individuals
-export { IndividualDetail } from './individuals';
+export { IndividualDetail, IndividualEdit } from './individuals';
 
 // Family Tree (to be added)
 // export { PedigreeChart, TreeControls, PersonCard } from './family-tree';

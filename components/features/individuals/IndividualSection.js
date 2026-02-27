@@ -16,13 +16,13 @@ export default function IndividualSection({ title, icon: Icon, count, children, 
   const headingClass = subtitle
     ? 'text-[0.8125rem] font-medium text-base-content/70'
     : 'text-lg font-semibold text-base-content';
-  const iconSize = subtitle ? 14 : 20;
+  const iconSize = subtitle ? 16 : 20;
 
   return (
     <section className="space-y-3">
       {(title || Icon) && (
         <div className="flex items-center gap-2">
-          {Icon && <Icon size={iconSize} />}
+          {Icon && <span className="shrink-0 flex items-center justify-center"><Icon size={iconSize} /></span>}
           {title && <h2 className={headingClass}>{title}</h2>}
           {count != null && (
             <span className="badge badge-ghost badge-sm">{count}</span>

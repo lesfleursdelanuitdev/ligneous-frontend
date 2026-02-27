@@ -16,10 +16,31 @@ export async function GET(request, { params }) {
     const hasSpouse = url.searchParams.get('has_spouse');
     const birthYear = url.searchParams.get('birth_year');
     const birthPlace = url.searchParams.get('birth_place');
+    const givenName = url.searchParams.get('given_name');
+    const surname = url.searchParams.get('surname');
     const advancedConditionsJson = url.searchParams.get('advanced_conditions');
 
     const andParts = [];
     const where = { fileUuid };
+
+    const hasGivenName = givenName?.trim();
+    const hasSurname = surname?.trim();
+    if (hasGivenName || hasSurname) {
+      const nameFormConditions = {};
+      if (hasGivenName) {
+        const givenLower = givenName.trim().toLowerCase();
+        nameFormConditions.givenNames = {
+          some: { givenName: { givenNameLower: givenLower } },
+        };
+      }
+      if (hasSurname) {
+        const surnameLower = surname.trim().toLowerCase();
+        nameFormConditions.surnames = {
+          some: { surname: { surnameLower: surnameLower } },
+        };
+      }
+      where.individualNameForms = { some: nameFormConditions };
+    }
 
     if (search) where.fullNameLower = { contains: search.toLowerCase() };
     if (sex) where.sex = sex.toUpperCase();
@@ -94,6 +115,7 @@ export async function GET(request, { params }) {
     let orderBy = { fullName: 'asc' };
     if (sort === 'birth_year') orderBy = { birthYear: order };
     else if (sort === 'death_year') orderBy = { deathYear: order };
+    else if (sort === 'sex') orderBy = { sex: order };
     else if (sort === 'name') orderBy = { fullName: order };
 
     const [individuals, total] = await Promise.all([

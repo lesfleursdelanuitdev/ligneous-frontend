@@ -73,7 +73,11 @@ export default function DataViewActions({
           <button
             key={action.key}
             type="button"
-            onClick={() => action.onClick?.(item)}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              action.onClick?.(item);
+            }}
             className={`${baseBtn} ${colorClass}`}
             title={action.label}
           >

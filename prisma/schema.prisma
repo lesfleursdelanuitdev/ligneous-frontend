@@ -1231,6 +1231,57 @@ enum GedcomDateType {
   UNKNOWN
 }
 
+enum GedcomTagScope {
+  INDI
+  FAM
+  BOTH
+  OTHER
+}
+
+enum EventTypeOwnerScope {
+  INDI
+  FAM
+  BOTH
+}
+
+// G0a. GEDCOM Tag Registry (standard + custom tags)
+model GedcomTag {
+  id         String          @id @default(uuid()) @db.Uuid
+  tag        String          @db.Text
+  label      String          @db.Text
+  scope      GedcomTagScope  @default(OTHER)
+  isCustom   Boolean         @default(false) @map("is_custom")
+  sortOrder  Int             @default(0) @map("sort_order")
+  fileUuid   String?         @map("file_uuid") @db.Uuid
+
+  file GedcomFile? @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  @@unique([tag, fileUuid])
+  @@index([tag])
+  @@index([fileUuid])
+  @@index([isCustom])
+  @@map("gedcom_tags")
+}
+
+// G0b. Event Type Registry (standard + custom event types)
+model EventType {
+  id          String               @id @default(uuid()) @db.Uuid
+  tag         String               @db.Text
+  label       String               @db.Text
+  ownerScope  EventTypeOwnerScope  @default(INDI) @map("owner_scope")
+  isCustom    Boolean              @default(false) @map("is_custom")
+  sortOrder   Int                  @default(0) @map("sort_order")
+  fileUuid    String?              @map("file_uuid") @db.Uuid
+
+  file GedcomFile? @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  @@unique([tag, fileUuid])
+  @@index([tag])
+  @@index([fileUuid])
+  @@index([isCustom])
+  @@map("event_types")
+}
+
 // G1. GEDCOM File Registry
 model GedcomFile {
   id               String    @id @default(uuid()) @db.Uuid
@@ -1271,7 +1322,11 @@ model GedcomFile {
   surnames     GedcomSurname[]
   givenNames   GedcomGivenName[]
   fileObjects  GedcomFileObject[]
-  tree         Tree?
+  gedcomTags      GedcomTag[]
+  eventTypes     EventType[]
+  occupations    GedcomOccupation[]
+  nationalities  GedcomNationality[]
+  tree           Tree?
 
   @@index([status])
   @@index([checksum])
@@ -1352,7 +1407,7 @@ model GedcomSurname {
 
   file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
 
-  individualSurnames GedcomIndividualSurname[]
+  nameFormSurnames GedcomNameFormSurname[]
   familySurnames     GedcomFamilySurname[]
 
   @@unique([fileUuid, surnameLower])
@@ -1361,6 +1416,43 @@ model GedcomSurname {
   @@index([fileUuid, soundex])
   @@index([fileUuid, frequency])
   @@map("gedcom_surnames_v2")
+}
+
+// G4b. Occupations (deduplicated per file)
+model GedcomOccupation {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  value      String   @db.Text
+  valueLower String   @map("value_lower") @db.Text
+  frequency  Int      @default(0)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualOccupations GedcomIndividualOccupation[]
+
+  @@unique([fileUuid, valueLower])
+  @@index([fileUuid])
+  @@index([fileUuid, valueLower])
+  @@map("gedcom_occupations_v2")
+}
+
+// G4c. Nationalities (deduplicated per file)
+model GedcomNationality {
+  id         String   @id @default(uuid()) @db.Uuid
+  fileUuid   String   @map("file_uuid") @db.Uuid
+  value      String   @db.Text
+  valueLower String   @map("value_lower") @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
+
+  individualNationalities GedcomIndividualNationality[]
+
+  @@unique([fileUuid, valueLower])
+  @@index([fileUuid])
+  @@index([fileUuid, valueLower])
+  @@map("gedcom_nationalities_v2")
 }
 
 // G5. Given Names
@@ -1374,7 +1466,7 @@ model GedcomGivenName {
 
   file GedcomFile @relation(fields: [fileUuid], references: [id], onDelete: Cascade)
 
-  individualGivenNames GedcomIndividualGivenName[]
+  nameFormGivenNames GedcomNameFormGivenName[]
 
   @@unique([fileUuid, givenNameLower])
   @@index([fileUuid])
@@ -1391,6 +1483,7 @@ model GedcomIndividual {
   fullName          String?    @map("full_name") @db.Text
   fullNameLower     String?    @map("full_name_lower") @db.Text
   sex               GedcomSex?
+  gender            String?    @db.Text
   birthDateId       String?    @map("birth_date_id") @db.Uuid
   birthPlaceId      String?    @map("birth_place_id") @db.Uuid
   birthDateDisplay  String?    @map("birth_date_display") @db.Text
@@ -1422,10 +1515,11 @@ model GedcomIndividual {
   individualEvents     GedcomIndividualEvent[]
   individualNotes      GedcomIndividualNote[]
   individualSources    GedcomIndividualSource[]
-  individualSurnames   GedcomIndividualSurname[]
-  individualGivenNames GedcomIndividualGivenName[]
-  individualMedia      GedcomIndividualMedia[]
-  parentAsParent       GedcomParentChild[]         @relation("PCParent")
+  individualNameForms    GedcomIndividualNameForm[]
+  individualMedia        GedcomIndividualMedia[]
+  individualOccupations  GedcomIndividualOccupation[]
+  individualNationalities GedcomIndividualNationality[]
+  parentAsParent         GedcomParentChild[]         @relation("PCParent")
   parentAsChild        GedcomParentChild[]         @relation("PCChild")
   familyChildAsChild   GedcomFamilyChild[]
   spouseAsIndividual   GedcomSpouse[]              @relation("SpouseIndi")
@@ -1776,42 +1870,97 @@ model GedcomEventSource {
   @@map("gedcom_event_sources_v2")
 }
 
-// G22. Junction: Individual <-> Surname
-model GedcomIndividualSurname {
+// G21a. Name Form: Individual <-> (given names + surnames) grouped by type
+model GedcomIndividualNameForm {
   id           String   @id @default(uuid()) @db.Uuid
   fileUuid     String   @map("file_uuid") @db.Uuid
   individualId String   @map("individual_id") @db.Uuid
-  surnameId    String   @map("surname_id") @db.Uuid
   nameType     String   @default("birth") @map("name_type") @db.Text
   isPrimary    Boolean  @default(false) @map("is_primary")
+  sortOrder    Int      @default(0) @map("sort_order")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
-  surname    GedcomSurname    @relation(fields: [surnameId], references: [id], onDelete: Cascade)
+  individual   GedcomIndividual       @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  givenNames   GedcomNameFormGivenName[]
+  surnames     GedcomNameFormSurname[]
 
-  @@unique([fileUuid, individualId, surnameId, nameType])
+  @@unique([fileUuid, individualId, nameType])
   @@index([individualId])
-  @@index([surnameId])
-  @@map("gedcom_individual_surnames_v2")
+  @@index([fileUuid])
+  @@map("gedcom_individual_name_forms")
 }
 
-// G23. Junction: Individual <-> Given Name
-model GedcomIndividualGivenName {
+// G21b. Name Form <-> Given Name
+model GedcomNameFormGivenName {
   id           String   @id @default(uuid()) @db.Uuid
   fileUuid     String   @map("file_uuid") @db.Uuid
-  individualId String   @map("individual_id") @db.Uuid
+  nameFormId   String   @map("name_form_id") @db.Uuid
   givenNameId  String   @map("given_name_id") @db.Uuid
   position     Int      @default(1)
-  isPrimary    Boolean  @default(false) @map("is_primary")
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
-  givenName  GedcomGivenName  @relation(fields: [givenNameId], references: [id], onDelete: Cascade)
+  nameForm   GedcomIndividualNameForm @relation(fields: [nameFormId], references: [id], onDelete: Cascade)
+  givenName  GedcomGivenName          @relation(fields: [givenNameId], references: [id], onDelete: Cascade)
 
-  @@unique([fileUuid, individualId, givenNameId, position])
-  @@index([individualId])
+  @@unique([nameFormId, givenNameId, position])
+  @@index([nameFormId])
   @@index([givenNameId])
-  @@map("gedcom_individual_given_names_v2")
+  @@map("gedcom_name_form_given_names")
+}
+
+// G21c. Name Form <-> Surname
+model GedcomNameFormSurname {
+  id           String   @id @default(uuid()) @db.Uuid
+  fileUuid     String   @map("file_uuid") @db.Uuid
+  nameFormId   String   @map("name_form_id") @db.Uuid
+  surnameId    String   @map("surname_id") @db.Uuid
+  position     Int      @default(1)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  nameForm GedcomIndividualNameForm @relation(fields: [nameFormId], references: [id], onDelete: Cascade)
+  surname  GedcomSurname            @relation(fields: [surnameId], references: [id], onDelete: Cascade)
+
+  @@unique([nameFormId, surnameId, position])
+  @@index([nameFormId])
+  @@index([surnameId])
+  @@map("gedcom_name_form_surnames")
+}
+
+// G23a. Junction: Individual <-> Occupation
+model GedcomIndividualOccupation {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileUuid       String   @map("file_uuid") @db.Uuid
+  individualId   String   @map("individual_id") @db.Uuid
+  occupationId   String   @map("occupation_id") @db.Uuid
+  valueOverride  String?  @map("value_override") @db.Text
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  occupation GedcomOccupation @relation(fields: [occupationId], references: [id], onDelete: Cascade)
+
+  @@unique([individualId, occupationId])
+  @@index([individualId])
+  @@index([occupationId])
+  @@map("gedcom_individual_occupations_v2")
+}
+
+// G23b. Junction: Individual <-> Nationality
+model GedcomIndividualNationality {
+  id             String   @id @default(uuid()) @db.Uuid
+  fileUuid       String   @map("file_uuid") @db.Uuid
+  individualId   String   @map("individual_id") @db.Uuid
+  nationalityId  String   @map("nationality_id") @db.Uuid
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  individual  GedcomIndividual @relation(fields: [individualId], references: [id], onDelete: Cascade)
+  nationality GedcomNationality @relation(fields: [nationalityId], references: [id], onDelete: Cascade)
+
+  @@unique([individualId, nationalityId])
+  @@index([individualId])
+  @@index([nationalityId])
+  @@map("gedcom_individual_nationalities_v2")
 }
 
 // G24. Junction: Family <-> Surname

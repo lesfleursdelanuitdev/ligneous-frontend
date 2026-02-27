@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import { BarChart2, BarChart3 } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
 import SurnameCard from '@/components/shared/cards/SurnameCard';
@@ -26,23 +27,35 @@ export default function TreeSurnamesPage() {
           error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No surnames', message: 'No surnames found in this tree.' }}
           defaultView="list"
-          renderCard={(row) => (
-            <SurnameCard
-              treeId={treeId}
-              surname={{
-                name: row.name ?? row.surname ?? row.value,
-                normalizedName: row.normalizedName,
-                individualsCount: row.frequency ?? row.count ?? 0,
-                familiesCount: row.familiesCount ?? 0,
-              }}
-            />
-          )}
-          renderRow={(row) => (
-            <>
-              <td className="px-6 py-4">{row.name ?? row.surname ?? row.value}</td>
-              <td className="px-6 py-4">{row.frequency ?? row.count ?? 0}</td>
-            </>
-          )}
+          renderCard={(row) => {
+            const name = row.name ?? row.surname ?? row.value ?? '';
+            return (
+              <Link href={`/trees/${treeId}/individuals?surname=${encodeURIComponent(name)}`} className="block">
+                <SurnameCard
+                  treeId={treeId}
+                  surname={{
+                    name,
+                    normalizedName: row.normalizedName,
+                    individualsCount: row.frequency ?? row.count ?? 0,
+                    familiesCount: row.familiesCount ?? 0,
+                  }}
+                />
+              </Link>
+            );
+          }}
+          renderRow={(row) => {
+            const name = row.name ?? row.surname ?? row.value ?? '';
+            return (
+              <>
+                <td className="px-6 py-4">
+                  <Link href={`/trees/${treeId}/individuals?surname=${encodeURIComponent(name)}`} className="link link-primary">
+                    {name}
+                  </Link>
+                </td>
+                <td className="px-6 py-4">{row.frequency ?? row.count ?? 0}</td>
+              </>
+            );
+          }}
           listHeaders={[
             { label: 'Surname', key: 'name', sortable: true },
             { label: 'Count', key: 'frequency', sortable: true },

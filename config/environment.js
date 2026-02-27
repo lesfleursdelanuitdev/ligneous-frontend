@@ -33,6 +33,8 @@ export const env = {
   LIB_API_URL: getEnv('LIB_API_URL', getEnv('GO_API_URL', 'http://localhost:8091')),
   // Legacy / client-exposed name for same backend
   NEXT_PUBLIC_GO_API_URL: getEnv('NEXT_PUBLIC_GO_API_URL', 'http://localhost:8091'),
+  // Python research/analytics API (given names, surname statistics) - server-side proxy only
+  PYTHON_API_URL: getEnv('PYTHON_API_URL', 'http://localhost:5001'),
 
   // Environment flags
   isDevelopment: getEnv('NODE_ENV') === 'development',

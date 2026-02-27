@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { LayoutGrid, Plus } from 'lucide-react';
+import { toast } from 'sonner';
 import DataView from './DataView';
 import DataViewSearch from './DataViewSearch';
 import DataViewSearchAdvanced from './DataViewSearchAdvanced';
@@ -11,6 +12,7 @@ import DataViewActions from './DataViewActions';
 import DataViewTabs from './DataViewTabs';
 import DataViewToolbar from './DataViewToolbar';
 import Pagination from '../navigation/Pagination';
+import DeleteConfirmationModal from './DeleteConfirmationModal';
 
 /**
  * DataViewContainer — single orchestrator for paginated, searchable,
@@ -79,8 +81,39 @@ export default function DataViewContainer({
   const [page, setPage] = useState(1);
   const [perPage, setPerPage] = useState(defaultPerPage);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [deleteModal, setDeleteModal] = useState({ open: false, item: null, config: null });
 
   const isSelectionMode = activeSection === 'selection';
+
+  // Transform actions: wire delete actions with performDelete to the confirmation modal;
+  // for delete without performDelete, show feedback so the click is not silent
+  const processedActions = useCallback(() => {
+    return actions.map((action) => {
+      if (action.key === 'delete') {
+        if (action.performDelete) {
+          return {
+            ...action,
+            onClick: (item) => {
+              setDeleteModal({
+                open: true,
+                item,
+                config: {
+                  getConfirmMessage: action.confirmMessage,
+                  performDelete: action.performDelete,
+                },
+              });
+            },
+          };
+        }
+        // Delete without performDelete (e.g. onClick: () => {}) — show feedback so click is not silent
+        return {
+          ...action,
+          onClick: () => toast.info('Delete is not yet implemented for this page.'),
+        };
+      }
+      return action;
+    });
+  }, [actions]);
   const isInitialMount = useRef(true);
 
   // Clear selection when exiting selection mode
@@ -161,11 +194,13 @@ export default function DataViewContainer({
   }, [items, getItemId]);
   const selectedIdsArray = Array.from(selectedIds);
 
+  const resolvedActions = processedActions();
+
   // Augment list headers: select column (when selection mode) + original + actions
   const augmentedHeaders = [
     ...(isSelectionMode ? [{ label: '', key: '_select', sortable: false }] : []),
     ...listHeaders,
-    ...(actions.length > 0 ? [{ label: 'Actions', key: '_actions', sortable: false }] : []),
+    ...(resolvedActions.length > 0 ? [{ label: 'Actions', key: '_actions', sortable: false }] : []),
   ];
 
   // Wrap renderRow: optional select checkbox + row content + actions column
@@ -183,9 +218,9 @@ export default function DataViewContainer({
         />
       </td>
     ) : null;
-    const actionsCell = actions.length > 0 ? (
-      <td key="_actions" className="px-4 py-3">
-        <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="row" />
+    const actionsCell = resolvedActions.length > 0 ? (
+      <td key="_actions" className="px-4 py-3 relative z-10">
+        <DataViewActions actions={resolvedActions} item={item} userPermissions={userPermissions} layout="row" />
       </td>
     ) : null;
     return (
@@ -218,14 +253,14 @@ export default function DataViewContainer({
         <div className="flex-1 min-h-0 [&>*]:border-0 [&>*]:rounded-none [&>*]:shadow-none">
           {cardContent}
         </div>
-        {actions.length > 0 && (
-          <div className="flex-shrink-0 px-4 pb-3">
-            <DataViewActions actions={actions} item={item} userPermissions={userPermissions} layout="card" />
+        {resolvedActions.length > 0 && (
+          <div className="flex-shrink-0 px-4 pb-3 relative z-10">
+            <DataViewActions actions={resolvedActions} item={item} userPermissions={userPermissions} layout="card" />
           </div>
         )}
       </div>
     );
-    return (actions.length > 0 || isSelectionMode) ? cardInner : cardContent;
+    return (resolvedActions.length > 0 || isSelectionMode) ? cardInner : cardContent;
   };
 
   // Tab content: list/grid + pagination only (toolbar is above tabs)
@@ -368,6 +403,15 @@ export default function DataViewContainer({
 
       {/* Tabs — below toolbar */}
       <DataViewTabs tabs={tabs} defaultTab="view-all" />
+
+      {/* Delete confirmation modal (when action uses performDelete + confirmMessage) */}
+      <DeleteConfirmationModal
+        open={deleteModal.open}
+        onClose={() => setDeleteModal({ open: false, item: null, config: null })}
+        item={deleteModal.item}
+        getConfirmMessage={deleteModal.config?.getConfirmMessage}
+        performDelete={deleteModal.config?.performDelete}
+      />
     </div>
   );
 }

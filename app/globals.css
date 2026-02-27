@@ -458,3 +458,26 @@ h4 { font-size: 1.125rem; }
 .input::placeholder {
   color: var(--color-text-muted);
 }
+
+/* Unified dropdown and date field styles - explicit border and padding */
+.dropdown-field,
+.date-field {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 0.875rem;
+  background: var(--color-bg-secondary);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 8px;
+  color: var(--color-text-primary);
+  min-height: 2.75rem;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  appearance: auto;
+  box-sizing: border-box;
+}
+
+.dropdown-field:focus,
+.date-field:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}

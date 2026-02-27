@@ -42,8 +42,8 @@ export async function GET(request, { params }) {
     if (error) return error;
 
     const url = new URL(request.url);
-    const { limit, offset } = parsePagination(url);
-    const type = url.searchParams.get('type');
+    const { limit, offset, sort, order } = parsePagination(url, { maxLimit: 10000 });
+    const type = url.searchParams.get('type') || url.searchParams.get('event_type');
     const yearFrom = url.searchParams.get('year_from');
     const yearTo = url.searchParams.get('year_to');
 
@@ -107,7 +107,18 @@ export async function GET(request, { params }) {
             },
           },
         },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: sort === 'date'
+          ? [
+              { date: { year: order } },
+              { date: { month: order } },
+              { date: { day: order } },
+              { sortOrder: 'asc' },
+            ]
+          : sort === 'place'
+            ? { place: { original: order } }
+            : sort === 'event_type'
+              ? { eventType: order }
+              : { sortOrder: 'asc' },
         skip: offset,
         take: limit,
       }),

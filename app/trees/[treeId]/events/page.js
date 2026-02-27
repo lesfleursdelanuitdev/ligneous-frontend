@@ -3,11 +3,35 @@
 import { useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { BarChart2, BarChart3 } from 'lucide-react';
+import { BarChart2, BarChart3, Clock } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
 import BaseCard from '@/components/shared/cards/BaseCard';
+import { EventsTimeline } from '@/components/shared/events';
 import { DataViewContainer, AddNewPlaceholder, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
 import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
+
+function EventsTimelineTab({ items, treeId, loading }) {
+  const [orientation, setOrientation] = useState('vertical');
+  if (loading) {
+    return (
+      <div className="py-12 flex flex-col items-center justify-center gap-3">
+        <span className="loading loading-spinner loading-lg text-primary" />
+        <p className="text-sm text-base-content/60">Loading events...</p>
+      </div>
+    );
+  }
+  if (!items?.length) {
+    return <p className="text-sm text-base-content/50 py-8">No events to display. Use filters or search to find events.</p>;
+  }
+  return (
+    <EventsTimeline
+      events={items}
+      treeId={treeId}
+      orientation={orientation}
+      onOrientationChange={setOrientation}
+    />
+  );
+}
 
 function LinkedTo({ items, treeId }) {
   if (!items || items.length === 0) return <span className="text-base-content/40">{'\u2014'}</span>;
@@ -42,6 +66,15 @@ export default function TreeEventsPage() {
   const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'events', queryParams);
   const items = data?.data || [];
   const totalItems = data?.pagination?.total ?? 0;
+
+  // Fetch all events for timeline (same filters, no pagination limit)
+  const timelineParams = {
+    ...queryParams,
+    perPage: 10000,
+    page: 1,
+  };
+  const { data: timelineData } = useTreeEntityList(treeId, 'events', timelineParams);
+  const timelineItems = timelineData?.data || [];
 
   if (!treeId) return <DashboardMainContentLayout treeId={treeId} title="Events"><p className="text-base-content/60">Missing tree ID.</p></DashboardMainContentLayout>;
 
@@ -115,12 +148,14 @@ export default function TreeEventsPage() {
             { value: 'date', label: 'Date' },
             { value: 'place', label: 'Place' },
           ]}
-          defaultSort="event_type"
+          defaultSort="date"
+          defaultSortDirection="asc"
           totalItems={totalItems}
-          defaultPerPage={10}
+          defaultPerPage={25}
           onParamsChange={setQueryParams}
           addNewComponent={<AddNewPlaceholder message="Add new event form coming soon." />}
           extraTabs={[
+            { key: 'timeline', label: 'Timeline', content: <EventsTimelineTab items={timelineItems} treeId={treeId} loading={isLoading} />, icon: Clock },
             { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
             { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
           ]}

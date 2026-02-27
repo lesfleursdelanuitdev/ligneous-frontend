@@ -1,7 +1,10 @@
 export { default as DataViewContainer } from './DataViewContainer';
+export { default as DeleteConfirmationModal } from './DeleteConfirmationModal';
 export { default as AddNewPlaceholder } from './AddNewPlaceholder';
 export { default as ChartsPlaceholder } from './ChartsPlaceholder';
 export { default as StatisticsPlaceholder } from './StatisticsPlaceholder';
+export { default as GivenNamesStatistics } from './GivenNamesStatistics';
+export { default as GivenNamesCharts } from './GivenNamesCharts';
 export { default as DataViewToolbar } from './DataViewToolbar';
 export { default as DataView } from './DataView';
 export { default as DataViewSearch } from './DataViewSearch';

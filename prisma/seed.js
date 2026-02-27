@@ -8,6 +8,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import bcrypt from 'bcrypt';
+import { seedGedcomRegistry } from './seed-gedcom-registry.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 config({ path: join(__dirname, '..', '.env.local') });
@@ -25,6 +26,8 @@ const prisma = new PrismaClient({ adapter });
 
 async function main() {
   console.log('🌱 Starting database seed...');
+
+  await seedGedcomRegistry(prisma);
 
   let user = await prisma.user.findFirst({
     where: { isWebsiteOwner: true },

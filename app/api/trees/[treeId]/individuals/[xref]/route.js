@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
 import { resolveTreeAccess } from '@/lib/tree-access';
+import { updateIndividualNames } from '@/lib/individuals/update-names';
 
 const CHILD_SELECT = {
   xref: true, fullName: true, sex: true,
@@ -10,15 +11,31 @@ const CHILD_SELECT = {
   deathDateDisplay: true, isLiving: true,
 };
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function GET(request, { params }) {
   try {
     const { treeId, xref: rawXref } = await params;
-    const xref = decodeURIComponent(rawXref);
+    let identifier;
+    try {
+      identifier = rawXref;
+      let prev = '';
+      while (prev !== identifier) {
+        prev = identifier;
+        identifier = decodeURIComponent(identifier);
+      }
+    } catch (decodeErr) {
+      throw decodeErr;
+    }
     const { fileUuid, error } = await resolveTreeAccess(request, treeId);
     if (error) return error;
+    const isUuid = UUID_REGEX.test(identifier);
+    const where = isUuid
+      ? { fileUuid, id: identifier }
+      : { fileUuid, xref: identifier };
 
     const individual = await prisma.gedcomIndividual.findFirst({
-      where: { fileUuid, xref },
+      where,
       include: {
         birthDate: true,
         birthPlace: true,
@@ -34,11 +51,18 @@ export async function GET(request, { params }) {
         individualSources: {
           include: { source: { select: { id: true, xref: true, title: true, author: true } } },
         },
-        individualSurnames: {
-          include: { surname: { select: { id: true, surname: true } } },
-        },
-        individualGivenNames: {
-          include: { givenName: { select: { id: true, givenName: true } } },
+        individualNameForms: {
+          include: {
+            givenNames: {
+              include: { givenName: { select: { id: true, givenName: true } } },
+              orderBy: { position: 'asc' },
+            },
+            surnames: {
+              include: { surname: { select: { id: true, surname: true } } },
+              orderBy: { position: 'asc' },
+            },
+          },
+          orderBy: [{ sortOrder: 'asc' }, { isPrimary: 'desc' }],
         },
         individualMedia: {
           include: { media: { select: { id: true, xref: true, fileRef: true, form: true, title: true } } },
@@ -97,6 +121,8 @@ export async function GET(request, { params }) {
     if (!individual) {
       return NextResponse.json({ error: 'Individual not found' }, { status: 404 });
     }
+
+    const xref = individual.xref;
 
     // Compute siblings: other children in families of origin
     const siblingMap = new Map();
@@ -185,6 +211,83 @@ export async function GET(request, { params }) {
     });
   } catch (err) {
     console.error('Individual detail error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 });
+    const body = { error: 'Internal server error' };
+    return new Response(JSON.stringify(body), { status: 500 });
+  }
+}
+
+export async function PATCH(request, { params }) {
+  try {
+    const { treeId, xref: rawXref } = await params;
+    let identifier = rawXref;
+    try {
+      let prev = '';
+      while (prev !== identifier) {
+        prev = identifier;
+        identifier = decodeURIComponent(identifier);
+      }
+    } catch {
+      // keep identifier as-is
+    }
+
+    const { fileUuid, error } = await resolveTreeAccess(request, treeId, 'write');
+    if (error) return error;
+
+    const body = await request.json();
+    const validSex = ['M', 'F', 'U', 'X'].includes(body.sex) ? body.sex : body.sex === '' ? null : undefined;
+    if (validSex === undefined && body.sex !== undefined) {
+      return NextResponse.json({ error: 'Invalid sex value' }, { status: 400 });
+    }
+
+    const updateData = {};
+    if (body.sex !== undefined) updateData.sex = validSex;
+    if (body.gender !== undefined) updateData.gender = body.gender && body.gender.trim() ? body.gender.trim() : null;
+    if (body.isLiving !== undefined) updateData.isLiving = Boolean(body.isLiving);
+    if (body.occupation !== undefined) updateData.occupation = body.occupation && body.occupation.trim() ? body.occupation.trim() : null;
+    if (body.religion !== undefined) updateData.religion = body.religion && body.religion.trim() ? body.religion.trim() : null;
+    if (body.nationality !== undefined) updateData.nationality = body.nationality && body.nationality.trim() ? body.nationality.trim() : null;
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(identifier);
+    const where = isUuid ? { fileUuid, id: identifier } : { fileUuid, xref: identifier };
+
+    const individualRecord = await prisma.gedcomIndividual.findFirst({
+      where,
+      select: { id: true },
+    });
+    if (!individualRecord) {
+      return NextResponse.json({ error: 'Individual not found' }, { status: 404 });
+    }
+    const individualId = individualRecord.id;
+
+    // If names are provided, update them in a transaction
+    if (Array.isArray(body.givenNames) || Array.isArray(body.surnames)) {
+      await prisma.$transaction(async (tx) => {
+        const { fullName } = await updateIndividualNames(
+          tx,
+          fileUuid,
+          individualId,
+          body.givenNames || [],
+          body.surnames || [],
+        );
+        if (fullName !== null) {
+          updateData.fullName = fullName;
+          updateData.fullNameLower = fullName.toLowerCase();
+        }
+      });
+    }
+
+    const individual = await prisma.gedcomIndividual.updateMany({
+      where,
+      data: updateData,
+    });
+
+    if (individual.count === 0) {
+      return NextResponse.json({ error: 'Individual not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ data: { updated: true } });
+  } catch (err) {
+    console.error('Individual PATCH error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

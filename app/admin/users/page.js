@@ -77,13 +77,6 @@ export default function AdminUsersPage() {
     );
   };
 
-  const handleDeleteUser = (user) => {
-    if (!confirm(`Are you sure you want to DELETE user ${user.username}? This action cannot be undone!`)) return;
-    deleteUser.mutate(
-      { userId: user.id },
-      { onError: (err) => alert(err.message) }
-    );
-  };
 
   if (!isReady) {
     return (
@@ -227,7 +220,15 @@ export default function AdminUsersPage() {
               key: 'delete',
               label: 'Delete',
               variant: 'danger',
-              onClick: (user) => !actionLoading && handleDeleteUser(user),
+              confirmMessage: (user) => (
+                <>
+                  <p className="font-medium">Delete user &quot;{user.username}&quot;?</p>
+                  <p className="mt-2 text-base-content/70">This action cannot be undone.</p>
+                </>
+              ),
+              performDelete: async (user) => {
+                await deleteUser.mutateAsync({ userId: user.id });
+              },
             },
           ]}
           addNewComponent={<AddNewPlaceholder title="Add User" />}

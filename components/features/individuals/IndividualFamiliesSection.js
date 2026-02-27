@@ -71,7 +71,7 @@ function FamilyOriginCard({ family, treeId, label }) {
           )}
           {family.marriageDateDisplay && (
             <div className="flex items-center gap-2 text-base-content/60">
-              <Calendar size={14} />
+              <Calendar size={16} />
               <span>Married: {family.marriageDateDisplay}</span>
             </div>
           )}
@@ -114,7 +114,7 @@ function SpouseFamilyCard({ family, treeId, currentXref }) {
           )}
           {family.marriageDateDisplay && (
             <div className="flex items-center gap-2 text-base-content/60">
-              <Calendar size={14} />
+              <Calendar size={16} />
               <span>Married: {family.marriageDateDisplay}</span>
             </div>
           )}
@@ -133,7 +133,7 @@ function SpouseFamilyCard({ family, treeId, currentXref }) {
         )}
         {children.length === 0 && family.childrenCount > 0 && (
           <div className="flex items-center gap-2 text-base-content/60 text-sm">
-            <Baby size={14} />
+            <Baby size={16} />
             <span>{family.childrenCount} {family.childrenCount === 1 ? 'child' : 'children'}</span>
           </div>
         )}
