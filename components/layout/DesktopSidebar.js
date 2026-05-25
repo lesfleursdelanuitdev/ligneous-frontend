@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useTreeCanManage } from '@/hooks/queries/useTreeCanManage';
 import {
   Home,
   Upload,
@@ -35,6 +36,7 @@ import {
   LayoutDashboard,
   Library,
   FolderCog,
+  Wrench,
   ShieldCheck,
   UsersRound,
   HeartHandshake,
@@ -270,6 +272,7 @@ const SECTION_IDS = {
   EVIDENCE: 'evidence',
   MEDIA: 'media',
   RESEARCH: 'research',
+  MANAGE: 'manage',
   ADMIN: 'administration',
 };
 
@@ -287,6 +290,7 @@ function getSectionForPath(pathname, treeId) {
   if (rest.startsWith('/sources') || rest.startsWith('/notes')) return SECTION_IDS.EVIDENCE;
   if (rest.startsWith('/pictures') || rest.startsWith('/videos') || rest.startsWith('/audio') || rest.startsWith('/documents') || rest.startsWith('/stories') || rest.startsWith('/albums') || rest.startsWith('/tags')) return SECTION_IDS.MEDIA;
   if (rest.startsWith('/research')) return SECTION_IDS.RESEARCH;
+  if (rest.startsWith('/manage')) return SECTION_IDS.MANAGE;
   return null;
 }
 
@@ -299,6 +303,7 @@ export default function DesktopSidebar({
   const pathname = usePathname();
   const { activeTree } = useActiveTree();
   const treeId = activeTree?.id;
+  const { canManage } = useTreeCanManage(treeId);
 
   const [openSections, setOpenSections] = useState(() => new Set([SECTION_IDS.MY_TREES]));
 
@@ -448,6 +453,19 @@ export default function DesktopSidebar({
               pathname={pathname}
               isCollapsed={isCollapsed}
             />
+            {canManage && (
+              <NavItem
+                item={{
+                  href: `/trees/${treeId}/manage`,
+                  label: 'Manage tree',
+                  icon: <Wrench size={20} />,
+                  activeStartsWith: true,
+                }}
+                activeStartsWith
+                pathname={pathname}
+                isCollapsed={isCollapsed}
+              />
+            )}
           </nav>
         )}
 

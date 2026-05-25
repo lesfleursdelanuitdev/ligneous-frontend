@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { GitMerge, BarChart2, BarChart3 } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
@@ -46,23 +47,43 @@ export default function TreeFamiliesPage() {
                 wife: f.wife,
                 children: f.children,
                 childrenCount: f.childrenCount,
-                marriageDate: f.marriageDate,
-                marriagePlace: f.marriagePlace,
-                divorceDate: f.divorceDate,
-                divorcePlace: f.divorcePlace,
+                marriageDate: f.marriageDateDisplay,
+                marriagePlace: f.marriagePlaceDisplay,
+                divorceDate: f.divorceDateDisplay,
+                divorcePlace: f.divorcePlaceDisplay,
               }}
             />
           )}
           renderRow={(f) => (
             <>
-              <td className="px-6 py-4 font-mono text-sm">{f.xref}</td>
-              <td className="px-6 py-4">{husbandName(f)}</td>
-              <td className="px-6 py-4">{wifeName(f)}</td>
+              <td className="px-6 py-4 font-mono text-sm">
+                <Link href={`/trees/${treeId}/families/${f.id}`} className="link link-primary">
+                  {f.xref}
+                </Link>
+              </td>
+              <td className="px-6 py-4">
+                {f.husband ? (
+                  <Link href={`/trees/${treeId}/individuals/${encodeURIComponent(f.husband.xref)}`} className="link link-primary">
+                    {husbandName(f)}
+                  </Link>
+                ) : (
+                  husbandName(f)
+                )}
+              </td>
+              <td className="px-6 py-4">
+                {f.wife ? (
+                  <Link href={`/trees/${treeId}/individuals/${encodeURIComponent(f.wife.xref)}`} className="link link-primary">
+                    {wifeName(f)}
+                  </Link>
+                ) : (
+                  wifeName(f)
+                )}
+              </td>
               <td className="px-6 py-4">{f.childrenCount ?? 0}</td>
             </>
           )}
           listHeaders={[
-            { label: 'ID', key: 'xref', sortable: false },
+            { label: 'ID', key: 'xref', sortable: true },
             { label: 'Husband', key: 'husband', sortable: true },
             { label: 'Wife', key: 'wife', sortable: true },
             { label: 'Children', key: 'children_count', sortable: true },
@@ -76,6 +97,7 @@ export default function TreeFamiliesPage() {
             { key: 'children_count', label: 'Children count', type: 'number' },
           ]}
           sortOptions={[
+            { value: 'xref', label: 'ID' },
             { value: 'husband', label: 'Husband' },
             { value: 'wife', label: 'Wife' },
             { value: 'children_count', label: 'Children' },
@@ -91,8 +113,8 @@ export default function TreeFamiliesPage() {
             { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge families form coming soon." />, icon: GitMerge },
           ]}
           actions={[
-            { key: 'view', label: 'View', href: () => '#' },
-            { key: 'edit', label: 'Edit', href: () => '#' },
+            { key: 'view', label: 'View', href: (f) => `/trees/${treeId}/families/${f.id}` },
+            { key: 'edit', label: 'Edit', href: (f) => `/trees/${treeId}/families/${f.id}/edit` },
             { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
           ]}
         />

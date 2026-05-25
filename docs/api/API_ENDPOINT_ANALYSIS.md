@@ -222,7 +222,7 @@ expect(individual.name).toHaveProperty('full');  // ❌ FAILS
 
 ### 1. Update Individuals Facet
 
-**File:** `/apps/ligneous-frontend/mycelia/facets/gedcom/individuals.js`
+**File:** `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/gedcom/individuals.js`
 
 #### Fix getParents (Line ~160)
 ```javascript
@@ -270,7 +270,7 @@ state.spouses = data.data || [];
 
 ### 2. Update Integration Tests
 
-**File:** `/apps/ligneous-frontend/mycelia/facets/__tests__/gedcom-individuals.integration.test.js`
+**File:** `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/__tests__/gedcom-individuals.integration.test.js`
 
 #### Fix Data Validation Tests (Line ~376)
 ```javascript

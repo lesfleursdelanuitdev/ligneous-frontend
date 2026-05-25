@@ -376,7 +376,7 @@ With duplicates.js fully tested, you can now:
 
 ## 📝 Test File Details
 
-**Location:** `/apps/ligneous-frontend/mycelia/facets/__tests__/gedcom-duplicates.integration.test.js`
+**Location:** `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/__tests__/gedcom-duplicates.integration.test.js`
 
 **Size:** 15 tests (11 active, 4 skipped)
 
@@ -386,7 +386,7 @@ With duplicates.js fully tested, you can now:
 
 **Prerequisites:**
 - Go API running on port 8090
-- GEDCOM files in `/apps/gedcom-go/testdata`
+- GEDCOM files in `/apps/temp-family-tree-code/gedcom-go/testdata`
 
 ---
 

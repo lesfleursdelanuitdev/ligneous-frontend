@@ -2,7 +2,7 @@
 
 ## Overview
 
-Created integration tests that use **real GEDCOM files** from `/apps/gedcom-go/testdata` and make **real API calls** to the Go API server at `http://localhost:8090`.
+Created integration tests that use **real GEDCOM files** from `/apps/temp-family-tree-code/gedcom-go/testdata` and make **real API calls** to the Go API server at `http://localhost:8090`.
 
 ## What Was Created
 
@@ -193,7 +193,7 @@ data.data = [...]  // Direct array
 cd /apps/ligneous-gedcom-api && ./api
 
 # Run integration tests
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm run test:integration:verbose
 
 # Output:

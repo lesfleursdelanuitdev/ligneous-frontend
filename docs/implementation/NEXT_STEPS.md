@@ -54,7 +54,7 @@
 
 **Commands:**
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 
 # 1. Create database (if not exists)
 createdb ligneous_frontend

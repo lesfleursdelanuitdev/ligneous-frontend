@@ -106,7 +106,7 @@ ligneous-frontend/
 ### Development
 
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm run dev
 ```
 

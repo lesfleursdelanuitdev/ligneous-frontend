@@ -96,7 +96,7 @@ End-to-end validation using real GEDCOM files and actual Go API.
 
 ### Real Test Files Used
 
-From `/apps/gedcom-go/testdata`:
+From `/apps/temp-family-tree-code/gedcom-go/testdata`:
 
 | File | Size | Individuals | Families | Description |
 |------|------|-------------|----------|-------------|
@@ -136,7 +136,7 @@ cd /apps/ligneous-gedcom-api
 curl http://localhost:8090/health
 
 # 3. Run integration tests
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm run test:integration
 ```
 

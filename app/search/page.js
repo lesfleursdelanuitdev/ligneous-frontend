@@ -1,18 +1,34 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { DashboardLayout, GlobalSearch, TreeCard } from '@/components';
+import {
+  DashboardLayout,
+  GlobalSearch,
+  NaturalLanguageSearchPanel,
+  TreeCard,
+} from '@/components';
+import { useExploreTrees } from '@/hooks/queries/useTreesList';
 
 function SearchContent() {
   const searchParams = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
+  const initialTreeId = searchParams.get('tree') || '';
 
   const [query, setQuery] = useState(initialQuery);
   const [activeTab, setActiveTab] = useState('all');
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const { data: treeListData } = useExploreTrees({ perPage: 50 });
+  const trees = useMemo(() => treeListData?.trees ?? [], [treeListData]);
+  const [selectedTreeId, setSelectedTreeId] = useState(initialTreeId);
+  useEffect(() => {
+    if (!selectedTreeId && trees.length > 0) {
+      setSelectedTreeId(trees[0].id);
+    }
+  }, [selectedTreeId, trees]);
 
   // Mock search - replace with real API
   useEffect(() => {
@@ -116,6 +132,30 @@ function SearchContent() {
         <p className="text-[var(--color-text-muted)] mt-1">
           Find trees, people, and places across all family histories
         </p>
+      </div>
+
+      {/* Natural-language search (Groq + Python research API) */}
+      <div className="mb-8 space-y-3">
+        {trees.length > 1 && (
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-muted)]">
+            <label htmlFor="nl-tree-select" className="font-medium">
+              Tree:
+            </label>
+            <select
+              id="nl-tree-select"
+              value={selectedTreeId}
+              onChange={(event) => setSelectedTreeId(event.target.value)}
+              className="rounded-lg border border-[var(--color-border)] bg-[var(--color-bg-elevated)] px-3 py-1.5 text-sm text-[var(--color-text-primary)] focus:border-[var(--color-accent)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-soft)]"
+            >
+              {trees.map((tree) => (
+                <option key={tree.id} value={tree.id}>
+                  {tree.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+        <NaturalLanguageSearchPanel treeId={selectedTreeId} defaultQuery={initialQuery} />
       </div>
 
       {/* Search Input */}

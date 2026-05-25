@@ -40,10 +40,10 @@ export default function FamilyCard({
 
   const getPersonName = (person) => {
     if (!person) return 'Unknown';
-    return person.name || `${person.givenName || ''} ${person.surname || ''}`.trim() || 'Unknown';
+    return person.fullName || person.name || `${person.givenName || ''} ${person.surname || ''}`.trim() || 'Unknown';
   };
 
-  return (
+  const cardContent = (
     <BaseCard
       clickable={!!onClick || !!familyLink}
       onClick={onClick}
@@ -124,5 +124,14 @@ export default function FamilyCard({
       </div>
     </BaseCard>
   );
+
+  if (familyLink && !onClick) {
+    return (
+      <Link href={familyLink} className={'block ' + (className || '')}>
+        {cardContent}
+      </Link>
+    );
+  }
+  return cardContent;
 }
 

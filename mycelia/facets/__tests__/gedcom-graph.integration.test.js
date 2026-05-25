@@ -1,12 +1,12 @@
 /**
  * Integration Test Suite for useGedcomGraph Facet
  * 
- * Tests the GEDCOM graph facet with REAL GEDCOM files from /apps/gedcom-go/testdata
+ * Tests the GEDCOM graph facet with REAL GEDCOM files from /apps/temp-family-tree-code/gedcom-go/testdata
  * and REAL API calls to the Go API server.
  * 
  * Prerequisites:
  * - GEDCOM lib API server must be running on http://localhost:8091
- * - GEDCOM test files must be available in /apps/gedcom-go/testdata
+ * - GEDCOM test files must be available in /apps/temp-family-tree-code/gedcom-go/testdata
  * 
  * These are integration tests, not unit tests!
  */
@@ -16,7 +16,7 @@ import { buildTestSystem } from '../../test-system.builder.js';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-const TESTDATA_PATH = '/apps/gedcom-go/testdata';
+const TESTDATA_PATH = '/apps/temp-family-tree-code/gedcom-go/testdata';
 const GO_API_URL = 'http://localhost:8091';
 
 // Known individuals from tree1.ged (Norman's family)

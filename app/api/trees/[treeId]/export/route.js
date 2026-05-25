@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 import { buildEnrichedDocumentFromDB } from '@/lib/export/gedcom-export';
 
-const LIB_API_URL = process.env.LIB_API_URL || 'http://localhost:8091';
+const LIB_API_URL = process.env.LIB_API_URL || 'http://localhost:8092';
 
 export async function GET(request, { params }) {
   try {
     const { treeId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'gedcom');
     if (error) return error;
 
     const url = new URL(request.url);

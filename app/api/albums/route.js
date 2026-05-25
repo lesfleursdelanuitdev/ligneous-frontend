@@ -98,6 +98,28 @@ export async function POST(request) {
       );
     }
 
+    const trimmedName = name.trim();
+    const publicFlag = Boolean(isPublic);
+    if (publicFlag) {
+      const dup = await prisma.album.findFirst({
+        where: {
+          userId: user.id,
+          isPublic: true,
+          name: { equals: trimmedName, mode: 'insensitive' },
+        },
+        select: { id: true },
+      });
+      if (dup) {
+        return NextResponse.json(
+          {
+            error:
+              'A public album with this name already exists. Use a different name or create a personal album.',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     // Get current max sortOrder for user's albums
     const maxSortOrder = await prisma.album.aggregate({
       where: { userId: user.id },
@@ -107,9 +129,9 @@ export async function POST(request) {
     const album = await prisma.album.create({
       data: {
         userId: user.id,
-        name: name.trim(),
+        name: trimmedName,
         description: description?.trim() || null,
-        isPublic: isPublic || false,
+        isPublic: publicFlag,
         coverMediaId: coverMediaId || null,
         sortOrder: (maxSortOrder._max.sortOrder || 0) + 1,
       },
@@ -132,6 +154,16 @@ export async function POST(request) {
     );
   } catch (error) {
     console.error('Error creating album:', error);
+    const msg = error?.message || '';
+    if (msg.includes('albums_user_public_lower_trim_name_unique')) {
+      return NextResponse.json(
+        {
+          error:
+            'A public album with this name already exists. Use a different name or create a personal album.',
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to create album' },
       { status: 500 }

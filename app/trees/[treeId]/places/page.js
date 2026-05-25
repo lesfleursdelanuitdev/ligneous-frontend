@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { GitMerge, BarChart2, BarChart3 } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
@@ -26,24 +27,38 @@ export default function TreePlacesPage() {
           error={error ? { message: error.message, onRetry: refetch } : null}
           emptyState={{ title: 'No places', message: 'No places found in this tree.' }}
           defaultView="list"
-          renderCard={(row) => (
-            <PlaceCard
-              treeId={treeId}
-              place={{
-                id: row.id,
-                name: row.name ?? row.place ?? row.value,
-                normalizedName: row.normalizedName,
-                latitude: row.latitude,
-                longitude: row.longitude,
-                eventsCount: row.eventsCount ?? 0,
-                individualsCount: row.individualsCount ?? 0,
-                familiesCount: row.familiesCount ?? 0,
-              }}
-            />
-          )}
-          renderRow={(row) => (
-            <td className="px-6 py-4">{row.name ?? row.place ?? row.value ?? row.id}</td>
-          )}
+          renderCard={(row) => {
+            const placeName = row.original || row.name || row.place || row.value;
+            const eventsUrl = `/trees/${treeId}/events?place_id=${encodeURIComponent(row.id)}${placeName ? `&place=${encodeURIComponent(placeName)}` : ''}`;
+            return (
+              <Link href={eventsUrl} className="block h-full">
+                <PlaceCard
+                  treeId={treeId}
+                  place={{
+                    id: row.id,
+                    name: row.name ?? row.place ?? row.value,
+                    normalizedName: row.normalizedName,
+                    latitude: row.latitude,
+                    longitude: row.longitude,
+                    eventsCount: row.eventsCount ?? 0,
+                    individualsCount: row.individualsCount ?? 0,
+                    familiesCount: row.familiesCount ?? 0,
+                  }}
+                />
+              </Link>
+            );
+          }}
+          renderRow={(row) => {
+            const placeName = row.name ?? row.place ?? row.value ?? row.id;
+            const eventsUrl = `/trees/${treeId}/events?place_id=${encodeURIComponent(row.id)}${row.original || row.name ? `&place=${encodeURIComponent(row.original || row.name || placeName)}` : ''}`;
+            return (
+              <td className="px-6 py-4">
+                <Link href={eventsUrl} className="link link-primary">
+                  {placeName}
+                </Link>
+              </td>
+            );
+          }}
           listHeaders={[{ label: 'Place', key: 'name', sortable: true }]}
           searchPlaceholder="Search places..."
           searchLabel="Place name"
@@ -59,14 +74,13 @@ export default function TreePlacesPage() {
           totalItems={totalItems}
           defaultPerPage={10}
           onParamsChange={setQueryParams}
-          addNewComponent={<AddNewPlaceholder message="Add new place form coming soon." />}
           extraTabs={[
             { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
             { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
             { key: 'merge', label: 'Merge', content: <AddNewPlaceholder message="Merge places form coming soon." />, icon: GitMerge },
           ]}
           actions={[
-            { key: 'view', label: 'View', href: () => '#' },
+            { key: 'view', label: 'View events', href: (row) => `/trees/${treeId}/events?place_id=${encodeURIComponent(row.id)}${row.original || row.name ? `&place=${encodeURIComponent(row.original || row.name || '')}` : ''}` },
             { key: 'edit', label: 'Edit', href: () => '#' },
             { key: 'delete', label: 'Delete', onClick: () => {}, variant: 'danger' },
           ]}

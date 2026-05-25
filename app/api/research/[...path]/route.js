@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/middleware';
-import { checkTreeAccessForProxy } from '@/lib/tree-access';
+import { can } from '@ligneous/authz';
+import { prisma } from '@/lib/database/prisma';
 
 const PYTHON_API_URL = process.env.PYTHON_API_URL || 'http://localhost:5001';
 
@@ -14,7 +15,7 @@ async function proxy(request, { params }, method) {
   // For tree-scoped paths (trees/<tree_id>/...), verify tree access
   if (segments[0] === 'trees' && segments[1]) {
     const treeId = segments[1];
-    const hasAccess = await checkTreeAccessForProxy(user.id, treeId, 'read');
+    const hasAccess = await can({ userId: user.id, entity: 'openQuestion', action: 'read', scope: 'tree', treeId }, prisma);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -22,9 +23,13 @@ async function proxy(request, { params }, method) {
   const qs = request.nextUrl.searchParams.toString();
   const url = `${PYTHON_API_URL}/api/research/${path}${qs ? `?${qs}` : ''}`;
 
+  const upstreamPersist = request.headers.get('X-Research-Persist');
   const headers = {
     'Content-Type': 'application/json',
     'X-User-Id': user.id,
+    ...(upstreamPersist != null && upstreamPersist !== ''
+      ? { 'X-Research-Persist': upstreamPersist }
+      : {}),
   };
 
   const fetchOpts = { method, headers };
@@ -83,4 +88,8 @@ export async function PUT(request, ctx) {
 
 export async function DELETE(request, ctx) {
   return proxy(request, ctx, 'DELETE');
+}
+
+export async function PATCH(request, ctx) {
+  return proxy(request, ctx, 'PATCH');
 }

@@ -322,7 +322,7 @@ export default function TreeViewer({ treeId }) {
    ./api
    
    # Terminal 2: Next.js
-   cd /apps/ligneous-frontend
+   cd /apps/gonsalves-genealogy/ligneous-frontend
    npm run dev
    ```
 

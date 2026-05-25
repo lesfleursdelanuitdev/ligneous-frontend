@@ -254,7 +254,7 @@ CREATE INDEX idx_password_reset_tokens_user_expires_used ON password_reset_token
 
 **To Apply:**
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate dev --name add_password_reset_tokens
 ```
 

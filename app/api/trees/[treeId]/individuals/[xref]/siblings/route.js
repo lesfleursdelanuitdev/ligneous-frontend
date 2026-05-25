@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 export async function GET(request, { params }) {
   try {
     const { treeId, xref: rawXref } = await params;
     const xref = decodeURIComponent(rawXref);
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'individual');
     if (error) return error;
 
     const individual = await prisma.gedcomIndividual.findFirst({

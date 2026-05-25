@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 /**
  * GET /api/trees/[treeId]/event-types
@@ -9,7 +9,7 @@ import { resolveTreeAccess } from '@/lib/tree-access';
 export async function GET(request, { params }) {
   try {
     const { treeId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'event');
     if (error) return error;
 
     const eventTypes = await prisma.eventType.findMany({

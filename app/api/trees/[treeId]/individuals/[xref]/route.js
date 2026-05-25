@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 import { updateIndividualNames } from '@/lib/individuals/update-names';
 
 const CHILD_SELECT = {
@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
     } catch (decodeErr) {
       throw decodeErr;
     }
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'individual');
     if (error) return error;
     const isUuid = UUID_REGEX.test(identifier);
     const where = isUuid
@@ -230,7 +230,7 @@ export async function PATCH(request, { params }) {
       // keep identifier as-is
     }
 
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'individual', 'update');
     if (error) return error;
 
     const body = await request.json();

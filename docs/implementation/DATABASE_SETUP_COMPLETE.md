@@ -69,7 +69,7 @@
 
 1. **Restart the Next.js dev server:**
    ```bash
-   cd /apps/ligneous-frontend
+   cd /apps/gonsalves-genealogy/ligneous-frontend
    npm run dev
    ```
 

@@ -6,7 +6,9 @@ import Link from 'next/link';
 import { BarChart2, BarChart3 } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
 import SurnameCard from '@/components/shared/cards/SurnameCard';
-import { DataViewContainer, ChartsPlaceholder, StatisticsPlaceholder } from '@/components/shared/data-display';
+import { DataViewContainer } from '@/components/shared/data-display';
+import SurnamesCharts from '@/components/shared/data-display/SurnamesCharts';
+import SurnamesStatistics from '@/components/shared/data-display/SurnamesStatistics';
 import { useTreeEntityList } from '@/hooks/queries/useTreeEntityList';
 
 export default function TreeSurnamesPage() {
@@ -75,8 +77,8 @@ export default function TreeSurnamesPage() {
           defaultPerPage={10}
           onParamsChange={setQueryParams}
           extraTabs={[
-            { key: 'charts', label: 'Charts', content: <ChartsPlaceholder message="Charts coming soon." />, icon: BarChart2 },
-            { key: 'statistics', label: 'Statistics', content: <StatisticsPlaceholder message="Statistics coming soon." />, icon: BarChart3 },
+            { key: 'charts', label: 'Charts', content: <SurnamesCharts treeId={treeId} />, icon: BarChart2 },
+            { key: 'statistics', label: 'Statistics', content: <SurnamesStatistics treeId={treeId} />, icon: BarChart3 },
           ]}
         />
     </DashboardMainContentLayout>

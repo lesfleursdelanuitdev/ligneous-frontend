@@ -2,7 +2,7 @@
 
 ## Overview
 
-These integration tests use **real GEDCOM files** from `/apps/gedcom-go/testdata` and make **real API calls** to the Go API server. Unlike unit tests that mock responses, these tests verify the entire stack works correctly.
+These integration tests use **real GEDCOM files** from `/apps/temp-family-tree-code/gedcom-go/testdata` and make **real API calls** to the Go API server. Unlike unit tests that mock responses, these tests verify the entire stack works correctly.
 
 ## Prerequisites
 
@@ -17,7 +17,7 @@ The server should be running on `http://localhost:8090`
 
 ### 2. Test Data Files
 
-The following GEDCOM files must be available in `/apps/gedcom-go/testdata`:
+The following GEDCOM files must be available in `/apps/temp-family-tree-code/gedcom-go/testdata`:
 - `xavier.ged` (101KB, ~150 individuals)
 - `gracis.ged` (163KB, ~100 individuals)
 - `tree1.ged` (211KB, for larger dataset tests)
@@ -138,9 +138,9 @@ curl http://localhost:8090/health
 
 **Problem**: GEDCOM test files not available
 
-**Solution**: Ensure files exist in `/apps/gedcom-go/testdata/`:
+**Solution**: Ensure files exist in `/apps/temp-family-tree-code/gedcom-go/testdata/`:
 ```bash
-ls -lh /apps/gedcom-go/testdata/*.ged
+ls -lh /apps/temp-family-tree-code/gedcom-go/testdata/*.ged
 ```
 
 ### Tests Timing Out
@@ -185,7 +185,7 @@ For CI/CD pipelines, ensure:
    ```yaml
    - name: Setup test data
      run: |
-       ls /apps/gedcom-go/testdata/*.ged
+       ls /apps/temp-family-tree-code/gedcom-go/testdata/*.ged
    ```
 
 3. **Cleanup after tests**:

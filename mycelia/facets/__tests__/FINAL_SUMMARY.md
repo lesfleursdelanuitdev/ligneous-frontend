@@ -2,7 +2,7 @@
 
 ## 🎉 Achievement Unlocked: Complete Testing Infrastructure!
 
-Successfully implemented and fixed a comprehensive two-tier testing strategy for GEDCOM facets using **real files** from `/apps/gedcom-go/testdata`.
+Successfully implemented and fixed a comprehensive two-tier testing strategy for GEDCOM facets using **real files** from `/apps/temp-family-tree-code/gedcom-go/testdata`.
 
 ## What Was Built
 
@@ -116,7 +116,7 @@ expect(validation.errors).toBeDefined();   // Fixed!
 
 ### Unit Tests (Fast, Always Run)
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 
 # All unit tests
 npm test
@@ -134,7 +134,7 @@ npm run test:watch
 cd /apps/ligneous-gedcom-api && ./api
 
 # Run integration tests
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm run test:integration
 
 # Verbose output

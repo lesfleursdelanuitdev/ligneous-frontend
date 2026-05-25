@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { BarChart2, BarChart3, Clock } from 'lucide-react';
 import { DashboardMainContentLayout } from '@/components';
@@ -61,7 +61,12 @@ function LinkedTo({ items, treeId }) {
 
 export default function TreeEventsPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const treeId = params?.treeId;
+  const placeIdFromUrl = searchParams?.get('place_id');
+  const placeNameFromUrl = searchParams?.get('place');
+  const dateIdFromUrl = searchParams?.get('date_id');
+  const dateLabelFromUrl = searchParams?.get('date');
   const [queryParams, setQueryParams] = useState({});
   const { data, isLoading, error, refetch } = useTreeEntityList(treeId, 'events', queryParams);
   const items = data?.data || [];
@@ -80,6 +85,19 @@ export default function TreeEventsPage() {
 
   return (
     <DashboardMainContentLayout treeId={treeId} title="Events" subtitle={`${totalItems} events`}>
+        {((placeIdFromUrl) || (dateIdFromUrl)) && (
+          <p className="text-sm text-base-content/70 mb-4">
+            {placeIdFromUrl && (
+              <>Showing events at <span className="font-medium text-base-content">{placeNameFromUrl || 'this place'}</span></>
+            )}
+            {placeIdFromUrl && dateIdFromUrl && ' · '}
+            {dateIdFromUrl && (
+              <>Showing events on <span className="font-medium text-base-content">{dateLabelFromUrl || 'this date'}</span></>
+            )}
+            {' · '}
+            <a href={`/trees/${treeId}/events`} className="link link-primary text-sm">Show all events</a>
+          </p>
+        )}
         <DataViewContainer
           items={items}
           loading={isLoading}
@@ -152,6 +170,10 @@ export default function TreeEventsPage() {
           defaultSortDirection="asc"
           totalItems={totalItems}
           defaultPerPage={25}
+          defaultFilterValues={{
+            ...(placeIdFromUrl ? { place_id: placeIdFromUrl } : {}),
+            ...(dateIdFromUrl ? { date_id: dateIdFromUrl } : {}),
+          }}
           onParamsChange={setQueryParams}
           addNewComponent={<AddNewPlaceholder message="Add new event form coming soon." />}
           extraTabs={[

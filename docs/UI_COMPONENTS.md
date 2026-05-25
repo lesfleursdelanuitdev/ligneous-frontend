@@ -1,6 +1,6 @@
 # UI Components Reference
 
-This document catalogues every reusable UI component in the Ligneous frontend (`/apps/ligneous-frontend/components`), including props, variants, and purpose.
+This document catalogues every reusable UI component in the Ligneous frontend (`/apps/gonsalves-genealogy/ligneous-frontend/components`), including props, variants, and purpose.
 
 ---
 

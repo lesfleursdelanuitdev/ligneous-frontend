@@ -5,12 +5,12 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 export async function GET(request, { params }) {
   try {
     const { treeId, threadId } = await params;
-    const { error } = await resolveTreeAccess(request, treeId, 'read');
+    const { error } = await resolveTreeAuthz(request, treeId, 'openQuestion');
     if (error) return error;
 
     const thread = await prisma.discussionThread.findFirst({
@@ -45,7 +45,7 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const { treeId, threadId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion', 'update');
     if (error) return error;
     if (!user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

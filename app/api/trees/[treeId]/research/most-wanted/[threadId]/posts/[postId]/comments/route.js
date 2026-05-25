@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 import { canComment, canModerateComments } from '@/lib/permissions/comments';
 
 const ENTITY_TYPE = 'discussion_post';
@@ -14,7 +14,7 @@ const userSelect = { id: true, username: true, name: true };
 export async function GET(request, { params }) {
   try {
     const { treeId, threadId, postId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'read');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion');
     if (error) return error;
 
     const post = await prisma.discussionPost.findFirst({
@@ -120,7 +120,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const { treeId, threadId, postId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion', 'create');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {

@@ -12,7 +12,7 @@
 import fs from 'fs';
 import path from 'path';
 
-const TESTDATA_DIR = '/apps/gedcom-go/testdata';
+const TESTDATA_DIR = '/apps/temp-family-tree-code/gedcom-go/testdata';
 const BASE_URL = process.env.BASE_URL || 'http://localhost:4000';
 const USERNAME = process.env.SEED_USERNAME || 'monalig';
 const PASSWORD = process.env.SEED_PASSWORD || (process.env.SEED_PASSWORD_FILE

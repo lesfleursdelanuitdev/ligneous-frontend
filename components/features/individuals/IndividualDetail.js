@@ -2,12 +2,12 @@
 
 import { useState, Fragment } from 'react';
 import { UserCircle, Users, ScrollText, Clock, Image, FileText, GitBranch, UsersRound, UserSearch, MessageSquare } from 'lucide-react';
-import IndividualView from './IndividualView';
-import IndividualOverviewSection from './IndividualOverviewSection';
-import IndividualFamiliesSection from './IndividualFamiliesSection';
-import IndividualNotesSection from './IndividualNotesSection';
-import IndividualEventsSection from './IndividualEventsSection';
-import IndividualLinkedSection from './IndividualLinkedSection';
+import IndividualView from './view/IndividualView';
+import IndividualOverviewSection from './sections/IndividualOverviewSection';
+import IndividualFamiliesSection from './sections/IndividualFamiliesSection';
+import IndividualNotesSection from './sections/IndividualNotesSection';
+import IndividualEventsSection from './sections/IndividualEventsSection';
+import IndividualLinkedSection from './sections/IndividualLinkedSection';
 
 function scrollToId(id) {
   document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });

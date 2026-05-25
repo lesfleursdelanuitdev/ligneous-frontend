@@ -20,7 +20,7 @@
 
 **Action:**
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate dev --name add_refresh_tokens
 ```
 
@@ -327,7 +327,7 @@ These are small tasks that can be done in parallel:
 **Apply the database migration:**
 
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate dev --name add_refresh_tokens
 ```
 

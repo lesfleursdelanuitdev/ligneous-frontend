@@ -3,7 +3,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/middleware';
-import { hasPermission } from '@/lib/permissions';
+import { can, isPublicTree } from '@ligneous/authz';
 import { canComment, canModerateComments } from '@/lib/permissions/comments';
 import { prisma } from '@/lib/database/prisma';
 
@@ -36,7 +36,11 @@ export async function GET(request) {
     );
   }
 
-  const canRead = await hasPermission(userId, treeId, entityType, entityId, 'read');
+  const entityMap = { story: 'story', discussion_post: 'openQuestion', individual: 'individual', family: 'family' };
+  const authzEntity = entityMap[entityType] ?? 'openQuestion';
+  const canRead = userId
+    ? await can({ userId, entity: authzEntity, action: 'read', scope: 'tree', treeId }, prisma)
+    : await isPublicTree(treeId, prisma);
   if (!canRead) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }

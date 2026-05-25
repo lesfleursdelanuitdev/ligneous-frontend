@@ -3,12 +3,12 @@
 import { useState, Fragment } from 'react';
 import Link from 'next/link';
 import { UserCircle, Users, ScrollText, Clock, Image, Eye } from 'lucide-react';
-import IndividualViewToolbar from './IndividualViewToolbar';
-import IndividualEditOverviewSection from './IndividualEditOverviewSection';
-import IndividualEditFamiliesSection from './IndividualEditFamiliesSection';
-import IndividualEditNotesSection from './IndividualEditNotesSection';
-import IndividualEditEventsSection from './IndividualEditEventsSection';
-import IndividualEditLinkedSection from './IndividualEditLinkedSection';
+import IndividualViewToolbar from './view/IndividualViewToolbar';
+import IndividualEditOverviewSection from './edit/IndividualEditOverviewSection';
+import IndividualEditFamiliesSection from './edit/IndividualEditFamiliesSection';
+import IndividualEditNotesSection from './edit/IndividualEditNotesSection';
+import IndividualEditEventsSection from './edit/IndividualEditEventsSection';
+import IndividualEditLinkedSection from './edit/IndividualEditLinkedSection';
 
 const EDIT_TABS = [
   { id: 'overview', label: 'Overview', icon: UserCircle },

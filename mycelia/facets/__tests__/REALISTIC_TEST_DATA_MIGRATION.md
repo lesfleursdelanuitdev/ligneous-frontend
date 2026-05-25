@@ -13,7 +13,7 @@ Updated the GEDCOM facet test suites to use realistic test data extracted from a
 
 ## Data Source
 
-**Primary Source**: `/apps/gedcom-go/testdata/xavier.ged`
+**Primary Source**: `/apps/temp-family-tree-code/gedcom-go/testdata/xavier.ged`
 - 101KB GEDCOM file
 - 150+ individuals across multiple generations
 - 75+ family records
@@ -24,7 +24,7 @@ Updated the GEDCOM facet test suites to use realistic test data extracted from a
 
 ### 1. Created `test-data.js` Module
 
-**Location**: `/apps/ligneous-frontend/mycelia/facets/__tests__/test-data.js`
+**Location**: `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/__tests__/test-data.js`
 
 **Contents**:
 ```javascript

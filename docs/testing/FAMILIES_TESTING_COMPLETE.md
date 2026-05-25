@@ -255,7 +255,7 @@ if (family.children !== null && family.children !== undefined) {
 
 ## 📝 Test File Details
 
-**Location:** `/apps/ligneous-frontend/mycelia/facets/__tests__/gedcom-families.integration.test.js`
+**Location:** `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/__tests__/gedcom-families.integration.test.js`
 
 **Size:** 12 tests across 6 describe blocks
 
@@ -265,7 +265,7 @@ if (family.children !== null && family.children !== undefined) {
 
 **Prerequisites:**
 - Go API running on port 8090
-- GEDCOM files in `/apps/gedcom-go/testdata`
+- GEDCOM files in `/apps/temp-family-tree-code/gedcom-go/testdata`
 
 ---
 

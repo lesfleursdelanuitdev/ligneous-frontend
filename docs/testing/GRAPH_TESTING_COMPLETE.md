@@ -446,7 +446,7 @@ With graph.js fully tested, you can now:
 
 ## 📝 Test File Details
 
-**Location:** `/apps/ligneous-frontend/mycelia/facets/__tests__/gedcom-graph.integration.test.js`
+**Location:** `/apps/gonsalves-genealogy/ligneous-frontend/mycelia/facets/__tests__/gedcom-graph.integration.test.js`
 
 **Size:** 18 tests across 10 describe blocks
 
@@ -456,7 +456,7 @@ With graph.js fully tested, you can now:
 
 **Prerequisites:**
 - Go API running on port 8090
-- GEDCOM files in `/apps/gedcom-go/testdata`
+- GEDCOM files in `/apps/temp-family-tree-code/gedcom-go/testdata`
 
 ---
 

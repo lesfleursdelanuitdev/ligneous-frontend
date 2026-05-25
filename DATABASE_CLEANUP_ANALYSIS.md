@@ -70,13 +70,13 @@
 ## How to Run Cleanup
 
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 ./scripts/cleanup-orphaned-trees.sh
 ```
 
 Or manually:
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 PGPASSWORD=ligneous_password psql -h localhost -U ligneous_user -d ligneous_frontend -f scripts/cleanup-orphaned-trees.sql
 ```
 

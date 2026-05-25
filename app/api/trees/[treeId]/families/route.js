@@ -1,14 +1,15 @@
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess, parsePagination, paginatedResponse } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
+import { parsePagination, paginatedResponse } from '@/lib/tree-access';
 
 export async function GET(request, { params }) {
   try {
     const { treeId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'family');
     if (error) return error;
 
     const url = new URL(request.url);
-    const { limit, offset, search } = parsePagination(url);
+    const { limit, offset, search, sort, order } = parsePagination(url);
     const advancedConditionsJson = url.searchParams.get('advanced_conditions');
 
     const where = { fileUuid };
@@ -44,6 +45,12 @@ export async function GET(request, { params }) {
     }
     if (andParts.length > 0) where.AND = andParts;
 
+    let orderBy = { xref: 'asc' };
+    if (sort === 'xref') orderBy = { xref: order };
+    else if (sort === 'husband') orderBy = { husband: { fullName: order } };
+    else if (sort === 'wife') orderBy = { wife: { fullName: order } };
+    else if (sort === 'children_count') orderBy = { childrenCount: order };
+
     const [families, total] = await Promise.all([
       prisma.gedcomFamily.findMany({
         where,
@@ -56,7 +63,7 @@ export async function GET(request, { params }) {
           husband: { select: { id: true, xref: true, fullName: true } },
           wife: { select: { id: true, xref: true, fullName: true } },
         },
-        orderBy: { xref: 'asc' },
+        orderBy,
         skip: offset,
         take: limit,
       }),

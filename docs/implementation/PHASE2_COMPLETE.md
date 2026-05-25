@@ -72,7 +72,7 @@ Phase 2 has been successfully implemented with:
 
 **Option 1: Using Prisma (Recommended)**
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate deploy
 ```
 
@@ -111,7 +111,7 @@ psql -U postgres -d ligneous_graphs -f prisma/migrations/20260213120000_add_pass
 
 1. **Apply Database Migration**
    ```bash
-   cd /apps/ligneous-frontend
+   cd /apps/gonsalves-genealogy/ligneous-frontend
    npx prisma migrate deploy
    ```
 

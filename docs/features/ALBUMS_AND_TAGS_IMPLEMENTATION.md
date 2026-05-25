@@ -223,7 +223,7 @@ Implemented a comprehensive albums and tags system for organizing media and enti
 The Prisma schema has been updated with all new models. To apply the migration:
 
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate dev --name add_albums_and_tags
 ```
 

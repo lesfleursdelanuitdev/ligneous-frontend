@@ -98,7 +98,7 @@ $ npm test -- mycelia/facets/__tests__/gedcom-files.integration.test.js
 cd /apps/ligneous-gedcom-api && ./api
 
 # Run file integration tests (PASSING)
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm test -- mycelia/facets/__tests__/gedcom-files.integration.test.js
 
 # Run individuals integration tests (needs fix)

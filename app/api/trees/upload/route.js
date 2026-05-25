@@ -13,7 +13,7 @@ import { prisma } from '@/lib/database/prisma';
 import { authenticateRequest } from '@/lib/middleware';
 import { importEnrichedDocument } from '@/lib/import/gedcom-import';
 
-const LIB_API_URL = process.env.LIB_API_URL || 'http://localhost:8091';
+const LIB_API_URL = process.env.LIB_API_URL || 'http://localhost:8092';
 
 export async function POST(request) {
   try {
@@ -80,11 +80,12 @@ export async function POST(request) {
     const enriched = result.enriched;
     const stats = result.stats;
 
-    const { gedcomFile, fileId } = await importEnrichedDocument(enriched, stats, {
-      name,
-      originalFilename: file.name || 'unknown.ged',
-      fileSize: file.size || null,
-    });
+    const { gedcomFile, fileId, familiesImported, duplicateCoupleMergeCount } =
+      await importEnrichedDocument(enriched, stats, {
+        name,
+        originalFilename: file.name || 'unknown.ged',
+        fileSize: file.size || null,
+      });
 
     // 6. Create Tree record
     const tree = await prisma.tree.create({
@@ -119,7 +120,8 @@ export async function POST(request) {
         createdAt: tree.createdAt,
         updatedAt: tree.updatedAt,
         individualsCount: stats.individuals || 0,
-        familiesCount: stats.families || 0,
+        familiesCount: familiesImported,
+        duplicateFamilyMerges: duplicateCoupleMergeCount,
         placesCount: stats.places || 0,
         eventsCount: stats.events || 0,
         notesCount: stats.notes || 0,

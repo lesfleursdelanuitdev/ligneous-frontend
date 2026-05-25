@@ -31,8 +31,8 @@ app/api/
 ## Key Documentation
 
 Current architecture is documented in:
-- `/apps/ligneous-frontend/ARCHITECTURE.md` - Current architecture
-- `/apps/ligneous-frontend/PORTS.md` - Port configuration
+- `/apps/gonsalves-genealogy/ligneous-frontend/ARCHITECTURE.md` - Current architecture
+- `/apps/gonsalves-genealogy/ligneous-frontend/PORTS.md` - Port configuration
 - `/apps/ligneous-gedcom-api/README.md` - Go API documentation
 - `/apps/ligneous-gedcom-api/ROUTES.md` - Go API endpoints
 

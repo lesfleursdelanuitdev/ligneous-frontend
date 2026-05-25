@@ -6,7 +6,7 @@
 
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/middleware';
-import { checkTreeAccessForProxy } from '@/lib/tree-access';
+import { can, isPublicTree } from '@ligneous/authz';
 import { prisma } from '@/lib/database/prisma';
 
 export async function GET(request, { params }) {
@@ -19,7 +19,9 @@ export async function GET(request, { params }) {
     const { user } = await getAuthenticatedUser(request);
     const userId = user?.id || null;
 
-    const hasAccess = await checkTreeAccessForProxy(userId, treeId, 'read');
+    const hasAccess = userId
+      ? await can({ userId, entity: 'individual', action: 'read', scope: 'tree', treeId }, prisma)
+      : await isPublicTree(treeId, prisma);
     if (!hasAccess) {
       return NextResponse.json({ error: 'Forbidden: You do not have access to this tree' }, { status: 403 });
     }

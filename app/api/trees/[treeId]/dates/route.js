@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess, parsePagination, paginatedResponse } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
+import { parsePagination, paginatedResponse } from '@/lib/tree-access';
 
 function buildContext(counts) {
   const parts = [];
@@ -14,7 +15,7 @@ function buildContext(counts) {
 export async function GET(request, { params }) {
   try {
     const { treeId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'date');
     if (error) return error;
 
     const url = new URL(request.url);

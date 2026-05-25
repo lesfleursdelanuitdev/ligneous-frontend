@@ -4,7 +4,7 @@
 
 All tests now use realistic test data from actual GEDCOM files:
 
-**Test Data Source**: `/apps/gedcom-go/testdata/xavier.ged`  
+**Test Data Source**: `/apps/temp-family-tree-code/gedcom-go/testdata/xavier.ged`  
 **Test Data Module**: `mycelia/facets/__tests__/test-data.js`
 
 The test data includes:

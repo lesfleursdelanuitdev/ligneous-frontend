@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "next dev -p 4000",
-    "build": "next build",
+    "dev": "next dev -p 4000 --webpack",
+    "build": "next build --webpack",
     "start": "next start -p 4000",
     "lint": "eslint",
     "test": "vitest run --exclude '**/*.integration.test.js'",
@@ -14,15 +14,24 @@
     "test:unit": "vitest run --exclude '**/*.integration.test.js'",
     "test:integration": "vitest run mycelia/facets/__tests__/*.integration.test.js",
     "test:integration:verbose": "vitest run mycelia/facets/__tests__/*.integration.test.js --reporter=verbose",
-    "db:seed": "node prisma/seed.js"
+    "db:seed": "node prisma/seed.js",
+    "db:migrate": "cd ../packages/ligneous-prisma && npx prisma migrate deploy",
+    "db:migrate:all": "cd ../packages/ligneous-prisma && npm run migrate:all",
+    "test:export-db": "node scripts/test-gedcom-export.mjs"
   },
   "prisma": {
     "seed": "node prisma/seed.js"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.9",
+    "@ligneous/album-view": "file:../packages/ligneous-album-view",
+    "@ligneous/auth": "file:../packages/auth",
+    "@ligneous/authz": "file:../packages/ligneous-authz",
+    "@ligneous/gedcom-events": "file:../packages/ligneous-gedcom-events",
+    "@ligneous/prisma": "file:../packages/ligneous-prisma",
+    "@ligneous/story-creator": "file:../packages/ligneous-story-creator",
+    "@ligneous/timeline-view": "file:../packages/ligneous-timeline-view",
     "@prisma/adapter-pg": "^7.3.0",
-    "@prisma/client": "^7.3.0",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@tiptap/extension-placeholder": "^3.20.0",
@@ -42,7 +51,6 @@
     "mycelia-kernel-plugin": "^1.6.0",
     "next": "16.1.4",
     "pg": "^8.17.2",
-    "prisma": "^7.3.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-konva": "^19.2.2",
@@ -50,6 +58,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "prisma": "^7.3.0",
     "@vitest/ui": "^4.0.18",
     "dotenv": "^17.2.3",
     "eslint": "^9",

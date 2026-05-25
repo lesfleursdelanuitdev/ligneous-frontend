@@ -2,7 +2,7 @@
 
 ## Summary
 
-Successfully implemented and tested integration tests with **real GEDCOM files** from `/apps/gedcom-go/testdata`.
+Successfully implemented and tested integration tests with **real GEDCOM files** from `/apps/temp-family-tree-code/gedcom-go/testdata`.
 
 ## Test Results
 
@@ -180,7 +180,7 @@ curl http://localhost:8090/health
 
 ### Run Tests
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 
 # All unit tests (PASSING ✅)
 npm run test:unit

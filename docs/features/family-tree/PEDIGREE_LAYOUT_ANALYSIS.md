@@ -657,11 +657,11 @@ const PEDIGREE_CONFIG = {
 ### 7.2 File Structure
 
 ```
-/apps/ligneous-frontend/app/test-pedigree/
+/apps/gonsalves-genealogy/ligneous-frontend/app/test-pedigree/
   └── page.js                    # Public test page (no auth)
       └── Uses: PedigreeChart component
 
-/apps/ligneous-frontend/components/
+/apps/gonsalves-genealogy/ligneous-frontend/components/
   └── pedigree/
       ├── PedigreeChart.js       # Main component
       ├── usePedigreeLayout.js   # Hook for position calculations

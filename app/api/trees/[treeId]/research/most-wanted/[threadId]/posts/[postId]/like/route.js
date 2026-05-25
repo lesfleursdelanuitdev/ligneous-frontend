@@ -5,7 +5,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 const ENTITY_TYPE = 'discussion_post';
 
@@ -27,7 +27,7 @@ async function ensurePostInTree(treeId, threadId, postId) {
 export async function POST(request, { params }) {
   try {
     const { treeId, threadId, postId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'read');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {
@@ -75,7 +75,7 @@ export async function POST(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { treeId, threadId, postId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'read');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {

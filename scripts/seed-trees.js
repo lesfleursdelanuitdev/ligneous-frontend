@@ -1,14 +1,17 @@
 #!/usr/bin/env node
 /**
- * Seed script to upload GEDCOM files and create tree records
- * 
- * This script:
- * 1. Uploads GEDCOM files to the Go API
- * 2. Creates tree records in the frontend database
- * 3. Associates them with the superuser (monalig)
+ * Seed script to create tree records from GEDCOM files
+ *
+ * Uses ligneous-gedcom-lib-api (parse-validate-enrich) then imports
+ * into the frontend database - same flow as the upload UI.
+ *
+ * 1. Send each GEDCOM file to lib-api for parse + validate + enrich
+ * 2. Import enriched data into the database
+ * 3. Create Tree + TreeOwner records for monalig
  */
 
-import { PrismaClient } from '@prisma/client';
+import './load-env.js';
+import { PrismaClient } from '@ligneous/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import fs from 'fs';
@@ -16,17 +19,15 @@ import path from 'path';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
 import { config } from '../config/index.js';
+import { importEnrichedDocument } from '../lib/import/gedcom-import.js';
 
-// Create PostgreSQL connection pool
 const pool = new pg.Pool({ connectionString: config.database.url });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-// Configuration
-const GO_API_URL = config.api.libApi.baseURL;
-const TESTDATA_DIR = '/apps/gedcom-go/testdata';
+const LIB_API_URL = config.api.libApi.baseURL;
+const TESTDATA_DIR = '/apps/temp-family-tree-code/gedcom-go/testdata';
 
-// Files to upload with display names
 const FILES_TO_UPLOAD = [
   { filename: 'royal92.ged', name: 'European Royal Families', description: 'European royal family genealogy data', isPublic: true },
   { filename: 'tree1.ged', name: 'Gonsalves Family Tree', description: 'Gonsalves family genealogy', isPublic: true },
@@ -35,14 +36,11 @@ const FILES_TO_UPLOAD = [
   { filename: 'pres2020.ged', name: 'US Presidents', description: 'United States Presidents genealogy data', isPublic: true },
 ];
 
-async function uploadToGoAPI(filePath, name) {
+async function processWithLibApi(filePath, name) {
   const form = new FormData();
   form.append('file', fs.createReadStream(filePath));
-  form.append('name', name);
 
-  console.log(`  Uploading to Go API: ${path.basename(filePath)}...`);
-  
-  const response = await fetch(`${GO_API_URL}/api/v1/files`, {
+  const response = await fetch(`${LIB_API_URL}/api/v1/parse-validate-enrich?generateIds=true`, {
     method: 'POST',
     body: form,
     headers: form.getHeaders(),
@@ -50,20 +48,19 @@ async function uploadToGoAPI(filePath, name) {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Go API upload failed: ${response.status} - ${text}`);
+    throw new Error(`Lib API failed: ${response.status} - ${text}`);
   }
 
-  const data = await response.json();
-  return data.data; // Contains file_id, metadata, etc.
+  return response.json();
 }
 
 async function main() {
-  console.log('🌳 GEDCOM Tree Seeding Script');
+  console.log('🌳 GEDCOM Tree Seeding Script (lib-api flow)');
   console.log('='.repeat(50));
+  console.log(`Lib API: ${LIB_API_URL}`);
+  console.log('');
 
   try {
-    // 1. Find the superuser (monalig)
-    console.log('\n📋 Finding superuser (monalig)...');
     const superuser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -74,110 +71,95 @@ async function main() {
     });
 
     if (!superuser) {
-      throw new Error('Superuser not found! Please run the database seed first.');
+      throw new Error('Superuser not found! Run "npm run db:seed" first.');
     }
-    console.log(`  ✓ Found superuser: ${superuser.username} (${superuser.id})`);
+    console.log(`✓ Found superuser: ${superuser.username} (${superuser.id})\n`);
 
-    // 2. Check existing trees to avoid duplicates
-    console.log('\n📋 Checking existing trees...');
-    const existingTrees = await prisma.tree.findMany({
-      select: { fileId: true, name: true },
-    });
-    const existingFileIds = new Set(existingTrees.map(t => t.fileId));
-    console.log(`  Found ${existingTrees.length} existing trees`);
+    const existingTrees = await prisma.tree.findMany({ select: { name: true } });
+    const existingNames = new Set(existingTrees.map((t) => t.name));
+    console.log(`Found ${existingTrees.length} existing trees\n`);
 
-    // 3. Upload each file
-    console.log('\n📤 Uploading GEDCOM files...');
-    
     for (const fileConfig of FILES_TO_UPLOAD) {
       const filePath = path.join(TESTDATA_DIR, fileConfig.filename);
-      
-      // Check if file exists
+
       if (!fs.existsSync(filePath)) {
-        console.log(`  ⚠️ Skipping ${fileConfig.filename} - file not found`);
+        console.log(`⚠ Skipping ${fileConfig.filename} - file not found`);
         continue;
       }
 
-      console.log(`\n📁 Processing: ${fileConfig.filename}`);
-      
-      try {
-        // Upload to Go API
-        const goApiResult = await uploadToGoAPI(filePath, fileConfig.name);
-        const fileId = goApiResult.file_id;
-        
-        console.log(`  ✓ Go API upload complete. File ID: ${fileId}`);
+      if (existingNames.has(fileConfig.name)) {
+        console.log(`⚠ Skipping ${fileConfig.name} - tree already exists`);
+        continue;
+      }
 
-        // Check if tree already exists in frontend DB
-        if (existingFileIds.has(fileId)) {
-          console.log(`  ⚠️ Tree with fileId ${fileId} already exists in database, skipping...`);
-          continue;
+      console.log(`📁 Processing: ${fileConfig.filename}`);
+
+      try {
+        console.log(`  Sending to lib-api (parse-validate-enrich)...`);
+        const result = await processWithLibApi(filePath, fileConfig.name);
+
+        const validation = result.validation || {};
+        if (validation.valid === false) {
+          const errors = (validation.errors || []).filter((e) => e.severity === 'error');
+          if (errors.length > 0) {
+            console.error(`  ❌ Validation errors: ${errors.length}`);
+            continue;
+          }
         }
 
-        // Create tree record in frontend database
-        console.log(`  Creating tree record in frontend database...`);
+        const enriched = result.enriched;
+        const stats = result.stats || {};
+
+        console.log(`  Importing into database...`);
+        const { gedcomFile, fileId, familiesImported } = await importEnrichedDocument(enriched, stats, {
+          name: fileConfig.name,
+          originalFilename: fileConfig.filename,
+          fileSize: fs.statSync(filePath).size,
+        });
+
         const tree = await prisma.tree.create({
           data: {
-            fileId: fileId,
+            fileId,
+            gedcomFileId: gedcomFile.id,
             name: fileConfig.name,
             description: fileConfig.description,
             isPublic: fileConfig.isPublic,
           },
         });
-        console.log(`  ✓ Tree created: ${tree.id}`);
 
-        // Create tree owner record for superuser
-        console.log(`  Assigning ownership to ${superuser.username}...`);
         await prisma.treeOwner.create({
           data: {
             treeId: tree.id,
             userId: superuser.id,
             isPrimary: true,
+            addedBy: superuser.id,
           },
         });
-        console.log(`  ✓ Ownership assigned`);
 
-        // Get some stats from the Go API
-        const statsResponse = await fetch(`${GO_API_URL}/api/v1/files/${fileId}`);
-        if (statsResponse.ok) {
-          const statsData = await statsResponse.json();
-          const stats = statsData.data;
-          console.log(`  📊 Stats: ${stats.individuals_count || 'N/A'} individuals, ${stats.families_count || 'N/A'} families`);
-        }
-
-        console.log(`  ✅ ${fileConfig.name} - Complete!`);
-        
+        console.log(`  ✓ ${fileConfig.name} - ${stats.individuals || 0} individuals, ${familiesImported} families`);
       } catch (err) {
-        console.error(`  ❌ Error processing ${fileConfig.filename}:`, err.message);
+        console.error(`  ❌ Error: ${err.message}`);
       }
     }
 
-    // 4. Summary
-    console.log('\n' + '='.repeat(50));
-    console.log('📊 Summary');
-    
     const finalTrees = await prisma.tree.findMany({
-      include: {
-        owners: {
-          include: { user: { select: { username: true } } },
-        },
-      },
+      include: { owners: { include: { user: { select: { username: true } } } } },
     });
-    
-    console.log(`\nTotal trees in database: ${finalTrees.length}`);
+
+    console.log('\n' + '='.repeat(50));
+    console.log(`Total trees: ${finalTrees.length}`);
     for (const tree of finalTrees) {
-      const owners = tree.owners.map(o => o.user.username).join(', ');
-      console.log(`  - ${tree.name} (${tree.isPublic ? 'Public' : 'Private'}) - Owners: ${owners}`);
+      const owners = tree.owners.map((o) => o.user.username).join(', ');
+      console.log(`  - ${tree.name} - Owners: ${owners}`);
     }
-
     console.log('\n✅ Seeding complete!');
-
   } catch (error) {
     console.error('\n❌ Error:', error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();
+    await pool.end();
   }
 }
 
 main();
-

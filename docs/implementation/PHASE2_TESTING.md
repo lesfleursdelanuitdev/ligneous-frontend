@@ -53,7 +53,7 @@ This document describes the test cases for Phase 2 implementations:
 
 ### Run All Tests
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npm test
 ```
 

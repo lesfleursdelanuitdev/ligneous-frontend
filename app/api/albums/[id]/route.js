@@ -146,6 +146,29 @@ export async function PUT(request, { params }) {
     if (coverMediaId !== undefined) updateData.coverMediaId = coverMediaId || null;
     if (sortOrder !== undefined) updateData.sortOrder = sortOrder;
 
+    const nextName = updateData.name !== undefined ? updateData.name : album.name;
+    const nextPublic = updateData.isPublic !== undefined ? updateData.isPublic : album.isPublic;
+    if (nextPublic) {
+      const dup = await prisma.album.findFirst({
+        where: {
+          userId: album.userId,
+          isPublic: true,
+          name: { equals: nextName, mode: 'insensitive' },
+          id: { not: id },
+        },
+        select: { id: true },
+      });
+      if (dup) {
+        return NextResponse.json(
+          {
+            error:
+              'A public album with this name already exists. Use a different name or keep this album personal.',
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const updatedAlbum = await prisma.album.update({
       where: { id },
       data: updateData,
@@ -172,6 +195,16 @@ export async function PUT(request, { params }) {
     });
   } catch (error) {
     console.error('Error updating album:', error);
+    const msg = error?.message || '';
+    if (msg.includes('albums_user_public_lower_trim_name_unique')) {
+      return NextResponse.json(
+        {
+          error:
+            'A public album with this name already exists. Use a different name or keep this album personal.',
+        },
+        { status: 409 },
+      );
+    }
     return NextResponse.json(
       { error: 'Failed to update album' },
       { status: 500 }

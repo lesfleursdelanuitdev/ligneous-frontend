@@ -95,6 +95,22 @@ const STANDARD_EVENT_TYPES = [
   { tag: 'MARS', label: 'Marriage Settlement', ownerScope: 'FAM' },
 ];
 
+/** Standard attribute types: tag, label, ownerScope (INDI|FAM|BOTH) */
+const STANDARD_ATTRIBUTE_TYPES = [
+  { tag: 'CAST', label: 'Caste', ownerScope: 'INDI' },
+  { tag: 'DSCR', label: 'Physical Description', ownerScope: 'INDI' },
+  { tag: 'EDUC', label: 'Education', ownerScope: 'INDI' },
+  { tag: 'IDNO', label: 'ID Number', ownerScope: 'INDI' },
+  { tag: 'NATI', label: 'Nationality', ownerScope: 'INDI' },
+  { tag: 'NMR', label: 'Number of Marriages', ownerScope: 'INDI' },
+  { tag: 'OCCU', label: 'Occupation', ownerScope: 'INDI' },
+  { tag: 'PROP', label: 'Property', ownerScope: 'INDI' },
+  { tag: 'RELI', label: 'Religion', ownerScope: 'INDI' },
+  { tag: 'SSN', label: 'Social Security Number', ownerScope: 'INDI' },
+  { tag: 'TITL', label: 'Title', ownerScope: 'INDI' },
+  { tag: 'FACT', label: 'Attribute', ownerScope: 'BOTH' },
+];
+
 /**
  * @param {PrismaClient} prisma
  */
@@ -129,5 +145,21 @@ export async function seedGedcomRegistry(prisma) {
       }
     }
     console.log('✅ Seeded', STANDARD_EVENT_TYPES.length, 'EventTypes');
+  }
+
+  const attributeTypeCount = await prisma.attributeType.count({ where: { fileUuid: null } });
+  if (attributeTypeCount > 0) {
+    console.log('✅ AttributeTypes already seeded; skipping.');
+  } else {
+    for (let i = 0; i < STANDARD_ATTRIBUTE_TYPES.length; i++) {
+      const { tag, label, ownerScope } = STANDARD_ATTRIBUTE_TYPES[i];
+      const existing = await prisma.attributeType.findFirst({ where: { tag, fileUuid: null } });
+      if (!existing) {
+        await prisma.attributeType.create({
+          data: { tag, label, ownerScope, isCustom: false, sortOrder: i },
+        });
+      }
+    }
+    console.log('✅ Seeded', STANDARD_ATTRIBUTE_TYPES.length, 'AttributeTypes');
   }
 }

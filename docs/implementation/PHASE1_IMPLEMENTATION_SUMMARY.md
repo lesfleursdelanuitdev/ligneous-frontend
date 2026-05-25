@@ -137,7 +137,7 @@ CREATE INDEX idx_sessions_user_refresh ON sessions(user_id, is_revoked, refresh_
 
 **To Apply:**
 ```bash
-cd /apps/ligneous-frontend
+cd /apps/gonsalves-genealogy/ligneous-frontend
 npx prisma migrate dev --name add_refresh_tokens
 ```
 

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess, parsePagination, paginatedResponse } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
+import { parsePagination, paginatedResponse } from '@/lib/tree-access';
 
 function clean(name) {
   if (!name) return null;
@@ -38,17 +39,21 @@ function buildLinkedTo(event) {
 export async function GET(request, { params }) {
   try {
     const { treeId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'event');
     if (error) return error;
 
     const url = new URL(request.url);
     const { limit, offset, sort, order } = parsePagination(url, { maxLimit: 10000 });
     const type = url.searchParams.get('type') || url.searchParams.get('event_type');
+    const placeId = url.searchParams.get('place_id');
+    const dateId = url.searchParams.get('date_id');
     const yearFrom = url.searchParams.get('year_from');
     const yearTo = url.searchParams.get('year_to');
 
     const where = { fileUuid };
     if (type) where.eventType = type.toUpperCase();
+    if (placeId) where.placeId = placeId;
+    if (dateId) where.dateId = dateId;
     const advancedConditionsJson = url.searchParams.get('advanced_conditions');
     let advancedConditions = [];
     try { if (advancedConditionsJson) advancedConditions = JSON.parse(advancedConditionsJson); } catch { advancedConditions = []; }

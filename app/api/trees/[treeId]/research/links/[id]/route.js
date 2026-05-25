@@ -1,10 +1,10 @@
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 export async function PATCH(request, { params }) {
   try {
     const { treeId, id } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion', 'update');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {
@@ -41,7 +41,7 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { treeId, id } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion', 'delete');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {

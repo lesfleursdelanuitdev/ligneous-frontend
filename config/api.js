@@ -15,7 +15,7 @@ export const apiConfig = {
     timeout: 30000,
   },
 
-  // GEDCOM backend (ligneous-gedcom-lib-api on port 8091)
+  // GEDCOM backend (ligneous-gedcom-lib-api on port 8092)
   libApi: {
     baseURL: env.LIB_API_URL,
     timeout: 30000,

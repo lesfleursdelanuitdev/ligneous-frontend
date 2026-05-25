@@ -5,12 +5,12 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 export async function GET(request, { params }) {
   try {
     const { treeId, threadId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'read');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion');
     if (error) return error;
     const userId = user?.id ?? null;
 
@@ -104,7 +104,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const { treeId, threadId } = await params;
-    const { user, error } = await resolveTreeAccess(request, treeId, 'write');
+    const { user, error } = await resolveTreeAuthz(request, treeId, 'openQuestion', 'create');
     if (error) return error;
     const userId = user?.id;
     if (!userId) {

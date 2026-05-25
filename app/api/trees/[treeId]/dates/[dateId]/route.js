@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/database/prisma';
-import { resolveTreeAccess } from '@/lib/tree-access';
+import { resolveTreeAuthz } from '@/lib/authz';
 
 function stripSlashes(name) {
   if (!name) return null;
@@ -9,7 +9,7 @@ function stripSlashes(name) {
 export async function GET(request, { params }) {
   try {
     const { treeId, dateId } = await params;
-    const { fileUuid, error } = await resolveTreeAccess(request, treeId);
+    const { fileUuid, error } = await resolveTreeAuthz(request, treeId, 'date');
     if (error) return error;
 
     const date = await prisma.gedcomDate.findFirst({

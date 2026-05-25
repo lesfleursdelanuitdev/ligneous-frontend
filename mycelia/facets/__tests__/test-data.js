@@ -1,6 +1,6 @@
 /**
  * Test Data - Realistic GEDCOM structures
- * Based on actual test data from /apps/gedcom-go/testdata/xavier.ged
+ * Based on actual test data from /apps/temp-family-tree-code/gedcom-go/testdata/xavier.ged
  * 
  * This represents what the Go API returns after parsing GEDCOM files.
  */

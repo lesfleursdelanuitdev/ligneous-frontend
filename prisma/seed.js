@@ -4,7 +4,7 @@
 import { config } from 'dotenv';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@ligneous/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import bcrypt from 'bcrypt';
