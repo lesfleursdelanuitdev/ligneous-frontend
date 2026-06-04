@@ -1,4 +1,5 @@
 export { default as BaseCard } from './BaseCard';
+export { default as StoryCard } from './StoryCard';
 export { default as CardSkeleton } from './CardSkeleton';
 export { default as EntityCard } from './EntityCard';
 
